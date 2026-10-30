@@ -157,12 +157,12 @@
 
 - (void)viewDidLoad {
     %orig;
-    self.view.hidden = YES;
+    ((UIViewController *)self).view.hidden = YES;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [((UIViewController *)self) dismissViewControllerAnimated:NO completion:nil];
 }
 
 %end
@@ -172,12 +172,12 @@
 
 - (void)viewDidLoad {
     %orig;
-    self.view.hidden = YES;
+    ((UIViewController *)self).view.hidden = YES;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [((UIViewController *)self) dismissViewControllerAnimated:NO completion:nil];
 }
 
 %end
