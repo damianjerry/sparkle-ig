@@ -181,6 +181,31 @@ static BOOL SPKFollowingFeedEnabled(void) {
 
 %end
 
+#pragma mark - Modern Home Feed Default Landing (IG 430+)
+
+%hook IGHomeSundialFeedContentContainerViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (SPKFollowingFeedEnabled()) {
+        if ([self respondsToSelector:@selector(navigateToFollowingFeedWithAnimated:)]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(self, @selector(navigateToFollowingFeedWithAnimated:), NO);
+        }
+    }
+}
+
+- (void)selectDefaultTabAndScrollToTop {
+    if (SPKFollowingFeedEnabled()) {
+        if ([self respondsToSelector:@selector(navigateToFollowingFeedWithAnimated:)]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(self, @selector(navigateToFollowingFeedWithAnimated:), NO);
+            return;
+        }
+    }
+    %orig;
+}
+
+%end
+
 %end
 
 extern "C" void SPKInstallFollowingFeedHooksIfEnabled(void) {
@@ -190,10 +215,12 @@ extern "C" void SPKInstallFollowingFeedHooksIfEnabled(void) {
         Class dsa = SPKResolveIGClass(@"IGDSAShared.IGDSAGatingManager", @"IGDSAGatingManager");
         Class factory = SPKResolveIGClass(@"IGMainFeedDataFetcherKit.IGMainFeedRequestConfigFactory", @"IGMainFeedRequestConfigFactory");
         Class tray = SPKResolveIGClass(@"IGStoryTrayUIModels.IGStoryTrayCellViewModel", @"IGStoryTrayCellViewModel");
+        Class container = SPKResolveIGClass(@"IGHomeSundialFeedContentContainer.IGHomeSundialFeedContentContainerViewController",
+                                           @"_TtC33IGHomeSundialFeedContentContainer47IGHomeSundialFeedContentContainerViewController");
 
-        SPKLog(@"FollowingFeed", @"installing hooks — picker=%@ dsa=%@ factory=%@ tray=%@ session=%@ viewModel=%@",
+        SPKLog(@"FollowingFeed", @"installing hooks — picker=%@ dsa=%@ factory=%@ tray=%@ container=%@ session=%@ viewModel=%@",
                picker ? @"OK" : @"NIL", dsa ? @"OK" : @"NIL", factory ? @"OK" : @"NIL",
-               tray ? @"OK" : @"NIL",
+               tray ? @"OK" : @"NIL", container ? @"OK" : @"NIL",
                objc_getClass("IGUserSession") ? @"OK" : @"NIL",
                objc_getClass("IGMainFeedViewModel") ? @"OK" : @"NIL");
 
@@ -201,6 +228,7 @@ extern "C" void SPKInstallFollowingFeedHooksIfEnabled(void) {
                        IGHomeFeedPickerMenuController = picker,
                        IGDSAGatingManager = dsa,
                        IGMainFeedRequestConfigFactory = factory,
-                       IGStoryTrayCellViewModel = tray);
+                       IGStoryTrayCellViewModel = tray,
+                       IGHomeSundialFeedContentContainerViewController = container);
     });
 }

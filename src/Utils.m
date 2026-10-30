@@ -1266,6 +1266,11 @@ static id SPKPrefValueWithMasterOverlay(NSString *key) {
 
             // Explore Grid hiding
             @"interface_hide_explore_grid",
+
+            // Refresh & feed stability (prevent feed shuffling)
+            @"feed_disable_bg_refresh",
+            @"feed_disable_home_refresh",
+            @"reels_disable_tab_refresh",
             nil
         ];
     });
