@@ -20,9 +20,6 @@ static NSString *const kSPKStabilityFailedLaunchCountKey = @"app_failed_launch_c
 static NSString *const kSPKSafeStartupModeKey = @"app_safe_startup";
 static NSString *const kSPKSafeStartupReasonKey = @"app_safe_startup_reason";
 
-static NSTimeInterval const kSPKStabilityRecentLaunchWindow = 300.0;
-static NSInteger const kSPKStabilityFailureThreshold = 2;
-
 static NSTimeInterval SPKNow(void) {
     return [NSDate date].timeIntervalSince1970;
 }
