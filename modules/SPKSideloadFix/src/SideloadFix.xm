@@ -1,6 +1,6 @@
 #import "Header.h"
 #import <dlfcn.h>
-#import <substrate.h>
+#import "fishhook.h"
 
 static NSURL *redirectedAppGroupURL(NSString *groupIdentifier) {
 	if (!groupIdentifier || ![groupIdentifier isKindOfClass:[NSString class]]) return nil;
@@ -106,10 +106,15 @@ BOOL isAppExtensionProcess(void) {
 %ctor {
 	void *sym = dlsym(RTLD_DEFAULT, "IGAppGroupContainerURL");
 	if (sym) {
-		MSHookFunction(sym, (void *)hooked_IGAppGroupContainerURL, (void **)&orig_IGAppGroupContainerURL);
+		orig_IGAppGroupContainerURL = (NSURL *(*)(void))sym;
 	}
 	void *symType = dlsym(RTLD_DEFAULT, "IGAppGroupContainerURLWithAppType");
 	if (symType) {
-		MSHookFunction(symType, (void *)hooked_IGAppGroupContainerURLWithAppType, (void **)&orig_IGAppGroupContainerURLWithAppType);
+		orig_IGAppGroupContainerURLWithAppType = (NSURL *(*)(NSInteger))symType;
 	}
+	struct rebinding appGroupRebinds[2] = {
+		{"IGAppGroupContainerURL", (void *)hooked_IGAppGroupContainerURL, NULL},
+		{"IGAppGroupContainerURLWithAppType", (void *)hooked_IGAppGroupContainerURLWithAppType, NULL}
+	};
+	rebind_symbols(appGroupRebinds, 2);
 }
