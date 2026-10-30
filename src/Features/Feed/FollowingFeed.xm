@@ -31,39 +31,7 @@ static BOOL SPKFollowingFeedEnabled(void) {
     NSMutableArray *items = menuItems.mutableCopy;
     [items removeObject:@(IGHomeFeedPickerMenuItemFollowing)];
     [items insertObject:@(IGHomeFeedPickerMenuItemFollowing) atIndex:0];
-    return %orig(userSession, items, homeViewModel, analyticsModule, navigationController, NO);
-}
-
-%end
-
-%hook IGHomeFeedPickerHelpers
-
-+ (BOOL)homeFeedPickerShouldShowFollowingFeed:(id)session {
-    return YES;
-}
-
-+ (BOOL)homeFeedPickerShouldShowFollowingFeedAsLatest:(id)session {
-    return YES;
-}
-
-+ (BOOL)homeFeedPickerShouldShowForYouFeed:(id)session {
-    return NO;
-}
-
-+ (BOOL)homeFeedPickerShouldShowSundialForYouFeed:(id)session {
-    return NO;
-}
-
-+ (BOOL)homeFeedPickerShouldShowFriendsLane:(id)a1 navConfiguration:(id)a2 {
-    return NO;
-}
-
-+ (BOOL)homeFeedPickerShouldShowNearbyLane:(id)a1 navConfiguration:(id)a2 sundialCaliforniaGatingManager:(id)a3 {
-    return NO;
-}
-
-+ (BOOL)homeFeedPickerShouldShowCarrera:(id)a1 navConfiguration:(id)a2 {
-    return NO;
+    return %orig(userSession, items, homeViewModel, analyticsModule, navigationController, forYouEnabled);
 }
 
 %end
@@ -111,22 +79,10 @@ static BOOL SPKFollowingFeedEnabled(void) {
 
 %hook IGHomeSundialFeedContentContainerViewController
 
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-    if (SPKFollowingFeedEnabled()) {
-        if ([self respondsToSelector:@selector(navigateToFollowingFeedWithAnimated:)]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(self, @selector(navigateToFollowingFeedWithAnimated:), NO);
-        }
-    }
-}
-
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     if (SPKFollowingFeedEnabled()) {
-        if ([self respondsToSelector:@selector(navigateToFollowingFeedWithAnimated:)]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(self, @selector(navigateToFollowingFeedWithAnimated:), NO);
-        }
-        dispatch_async(dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             if ([self respondsToSelector:@selector(navigateToFollowingFeedWithAnimated:)]) {
                 ((void (*)(id, SEL, BOOL))objc_msgSend)(self, @selector(navigateToFollowingFeedWithAnimated:), NO);
             }
@@ -152,20 +108,18 @@ extern "C" void SPKInstallFollowingFeedHooksIfEnabled(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         Class picker = SPKResolveIGClass(@"IGHomeFeedPicker.IGHomeFeedPickerMenuController", @"IGHomeFeedPickerMenuController");
-        Class helpers = SPKResolveIGClass(@"IGHomeFeedPicker.IGHomeFeedPickerHelpers", @"IGHomeFeedPickerHelpers");
         Class dsa = SPKResolveIGClass(@"IGDSAShared.IGDSAGatingManager", @"IGDSAGatingManager");
         Class tray = SPKResolveIGClass(@"IGStoryTrayUIModels.IGStoryTrayCellViewModel", @"IGStoryTrayCellViewModel");
         Class container = SPKResolveIGClass(@"IGHomeSundialFeedContentContainer.IGHomeSundialFeedContentContainerViewController",
                                            @"_TtC33IGHomeSundialFeedContentContainer47IGHomeSundialFeedContentContainerViewController");
 
-        SPKLog(@"FollowingFeed", @"installing hooks — picker=%@ helpers=%@ dsa=%@ tray=%@ container=%@",
-               picker ? @"OK" : @"NIL", helpers ? @"OK" : @"NIL", dsa ? @"OK" : @"NIL",
+        SPKLog(@"FollowingFeed", @"installing hooks — picker=%@ dsa=%@ tray=%@ container=%@",
+               picker ? @"OK" : @"NIL", dsa ? @"OK" : @"NIL",
                tray ? @"OK" : @"NIL", container ? @"OK" : @"NIL");
 
-        if (picker || helpers) {
+        if (picker) {
             %init(SPKFollowingPickerHooks,
-                  IGHomeFeedPickerMenuController = picker,
-                  IGHomeFeedPickerHelpers = helpers);
+                  IGHomeFeedPickerMenuController = picker);
         }
 
         if (dsa) {

@@ -1,47 +1,13 @@
-#import "SPKStrings.h"
-// SPKStabilityGuard — a launch failsafe.
-//
-// Each launch records a start timestamp. If a launch never reaches the "stable"
-// mark (set ~5s after the app is active and all staged hooks installed) and the
-// next launch starts within kSPKStabilityRecentLaunchWindow, it's counted as an
-// incomplete launch. After kSPKStabilityFailureThreshold consecutive incomplete
-// launches the tweak enters *safe startup mode*: feature hooks are suppressed
-// (only Settings access remains) and Liquid Glass is disabled, so a hook that
-// crashes Instagram on launch can't lock the user out permanently. The user can
-// clear this from Tools > "Reset Safe Startup Mode" (SPKStabilityGuardReset).
 #import "SPKStabilityGuard.h"
-
-#import "../Shared/UI/SPKIGAlertPresenter.h"
+#import "SPKStrings.h"
 #import "../Utils.h"
 
-static NSString *const kSPKStabilityLaunchStartedAtKey = @"app_launch_started_at";
-static NSString *const kSPKStabilityLaunchCompletedAtKey = @"app_launch_completed_at";
-static NSString *const kSPKStabilityFailedLaunchCountKey = @"app_failed_launch_count";
-static NSString *const kSPKSafeStartupModeKey = @"app_safe_startup";
-static NSString *const kSPKSafeStartupReasonKey = @"app_safe_startup_reason";
-
-static NSTimeInterval SPKNow(void) {
-    return [NSDate date].timeIntervalSince1970;
-}
-
 void SPKStabilityGuardBeginLaunch(void) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults removeObjectForKey:kSPKSafeStartupModeKey];
-    [defaults removeObjectForKey:kSPKStabilityFailedLaunchCountKey];
-    [defaults removeObjectForKey:kSPKSafeStartupReasonKey];
-    [defaults removeObjectForKey:kSPKStabilityLaunchStartedAtKey];
-    [defaults removeObjectForKey:kSPKStabilityLaunchCompletedAtKey];
-    [defaults synchronize];
-    SPKLog(@"Stability", @"Launch guard armed (hardcoded normal mode)");
+    // Hardcoded disabled: tweak is locked in permanent active mode
 }
 
 void SPKStabilityGuardMarkHooksFinished(void) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults removeObjectForKey:kSPKStabilityLaunchStartedAtKey];
-    [defaults removeObjectForKey:kSPKStabilityFailedLaunchCountKey];
-    [defaults setDouble:SPKNow() forKey:kSPKStabilityLaunchCompletedAtKey];
-    [defaults synchronize];
-    SPKLog(@"Stability", @"Launch marked stable");
+    // Hardcoded disabled
 }
 
 BOOL SPKStabilityGuardIsSafeStartupMode(void) {
@@ -49,41 +15,9 @@ BOOL SPKStabilityGuardIsSafeStartupMode(void) {
 }
 
 void SPKStabilityGuardPresentSafeModeAlertIfNeeded(void) {
-    if (!SPKStabilityGuardIsSafeStartupMode()) {
-        return;
-    }
-
-    NSString *reason = [[NSUserDefaults standardUserDefaults] stringForKey:kSPKSafeStartupReasonKey] ?: @"unknown";
-    SPKLog(@"Stability", @"Presenting safe startup alert (reason: %@)", reason);
-
-    [SPKIGAlertPresenter presentAlertFromViewController:nil
-                                                 title:SPKL(@"APP_STABILITY_GUARD_SPARKLE_SAFE_MODE_TEXT")
-                                               message:SPKL(@"APP_STABILITY_GUARD_INSTAGRAM_CLOSED_BEFORE_FINISHING_LAUNCH_SEVERAL_TIMES_ROW_SO_TEXT")
-                                               actions:@[
-                                                   [SPKIGAlertAction actionWithTitle:SPKL(@"ALERT_ACTION_TURN_OFF_SAFE_MODE")
-                                                                               style:SPKIGAlertActionStyleDefault
-                                                                             handler:^{
-                                                                                 SPKStabilityGuardReset();
-                                                                                 [SPKUtils showRestartConfirmation];
-                                                                             }],
-                                                   [SPKIGAlertAction actionWithTitle:SPKL(@"ALERT_ACTION_OPEN_SPARKLE_SETTINGS")
-                                                                               style:SPKIGAlertActionStyleDefault
-                                                                             handler:^{
-                                                                                 [SPKUtils showSettingsForTopicTitle:@"Tools"];
-                                                                             }],
-                                                   [SPKIGAlertAction actionWithTitle:SPKL(@"ALERT_ACTION_NOT_NOW")
-                                                                               style:SPKIGAlertActionStyleCancel
-                                                                             handler:nil],
-                                               ]];
+    // Hardcoded disabled
 }
 
 void SPKStabilityGuardReset(void) {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults removeObjectForKey:kSPKStabilityLaunchStartedAtKey];
-    [defaults removeObjectForKey:kSPKStabilityFailedLaunchCountKey];
-    [defaults removeObjectForKey:kSPKSafeStartupModeKey];
-    [defaults removeObjectForKey:kSPKSafeStartupReasonKey];
-    [defaults removeObjectForKey:kSPKStabilityLaunchCompletedAtKey];
-    [defaults synchronize];
-    SPKLog(@"Stability", @"Safe startup state reset");
+    // Hardcoded disabled
 }

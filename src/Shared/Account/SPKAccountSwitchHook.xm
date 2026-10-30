@@ -49,13 +49,13 @@ static BOOL SPKIsBlockedAccountText(NSString *raw) {
         [t containsString:@"log out"] ||
         [t containsString:@"logout"] ||
         [t containsString:@"sign out"] ||
-        [t containsString:@"adaug"] || // Adaugă un cont, Adăugare cont, etc.
+        [t containsString:@"adaug"] || // Adaugă un cont, Adăugare cont
         [t containsString:@"add account"] ||
         [t containsString:@"add an account"] ||
         [t containsString:@"comut"] || // Comută pe alt cont, Comutare conturi
         [t containsString:@"switch account"] ||
         [t containsString:@"switch user"] ||
-        [t containsString:@"centru de conturi"] || // Centrul de conturi
+        [t containsString:@"centru de conturi"] ||
         [t containsString:@"centrul de conturi"] ||
         [t containsString:@"administrare conturi"] ||
         [t containsString:@"account center"] ||
@@ -68,30 +68,22 @@ static BOOL SPKIsBlockedAccountText(NSString *raw) {
 static BOOL SPKViewContainsBlockedText(UIView *view) {
     if (!view) return NO;
 
-    // Check accessibilityLabel on ANY UIView (critical for SwiftUI!)
     if ([view respondsToSelector:@selector(accessibilityLabel)]) {
         if (SPKIsBlockedAccountText(view.accessibilityLabel)) return YES;
     }
-    if ([view respondsToSelector:@selector(accessibilityValue)]) {
-        id val = [view valueForKey:@"accessibilityValue"];
-        if ([val isKindOfClass:[NSString class]] && SPKIsBlockedAccountText((NSString *)val)) return YES;
-    }
 
-    // Check UILabel
     if ([view isKindOfClass:[UILabel class]]) {
         UILabel *lbl = (UILabel *)view;
         if (SPKIsBlockedAccountText(lbl.text)) return YES;
         if (SPKIsBlockedAccountText(lbl.attributedText.string)) return YES;
     }
 
-    // Check UIButton
     if ([view isKindOfClass:[UIButton class]]) {
         UIButton *btn = (UIButton *)view;
         if (SPKIsBlockedAccountText([btn titleForState:UIControlStateNormal])) return YES;
         if (SPKIsBlockedAccountText(btn.titleLabel.text)) return YES;
     }
 
-    // Check UITextView
     if ([view isKindOfClass:[UITextView class]]) {
         if (SPKIsBlockedAccountText(((UITextView *)view).text)) return YES;
     }
@@ -126,19 +118,16 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
             btn.hidden = YES;
             btn.alpha = 0.0;
             btn.userInteractionEnabled = NO;
-            [btn removeFromSuperview];
             return;
         }
     }
 
-    // Check if the current view directly represents a blocked row/item
     if (SPKViewContainsBlockedText(view)) {
         NSString *cls = NSStringFromClass([view class]);
-        if ([cls containsString:@"Row"] || [cls containsString:@"Cell"] || [cls containsString:@"Item"] || [cls containsString:@"Facepile"]) {
+        if ([cls containsString:@"Row"] || [cls containsString:@"Cell"] || [cls containsString:@"Facepile"]) {
             view.hidden = YES;
             view.alpha = 0.0;
             view.userInteractionEnabled = NO;
-            [view removeFromSuperview];
             return;
         }
     }
@@ -154,10 +143,6 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 
 %hook IGLogoutS2NavigationPlugin
 
-- (id)init {
-    return nil;
-}
-
 - (void)performActionWithNavigationController:(id)nav userSession:(id)session {
     SPKLog(@"AccountLock", @"Blocked IGLogoutS2NavigationPlugin action");
     return;
@@ -166,10 +151,6 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 %end
 
 %hook IGAddAccountS2NavigationPlugin
-
-- (id)init {
-    return nil;
-}
 
 - (void)performActionWithNavigationController:(id)nav userSession:(id)session {
     SPKLog(@"AccountLock", @"Blocked IGAddAccountS2NavigationPlugin action");
@@ -180,21 +161,9 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 
 %hook IGAddNewProfessionalAccountS2NavigationPlugin
 
-- (id)init {
-    return nil;
-}
-
 - (void)performActionWithNavigationController:(id)nav userSession:(id)session {
     SPKLog(@"AccountLock", @"Blocked IGAddNewProfessionalAccountS2NavigationPlugin action");
     return;
-}
-
-%end
-
-%hook IGAccountsCenterS2NavigationPlugin
-
-- (id)init {
-    return nil;
 }
 
 %end
@@ -207,7 +176,14 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
     selfView.hidden = YES;
     selfView.alpha = 0.0;
     selfView.userInteractionEnabled = NO;
-    [selfView removeFromSuperview];
+}
+
+- (void)didMoveToSuperview {
+    %orig;
+    UIView *selfView = (UIView *)self;
+    selfView.hidden = YES;
+    selfView.alpha = 0.0;
+    selfView.userInteractionEnabled = NO;
 }
 
 %end
@@ -261,18 +237,6 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 }
 
 - (void)onTitleTap {
-    return;
-}
-
-- (void)titleViewControllerDidTapTitle:(id)sender {
-    return;
-}
-
-- (void)titleViewControllerDidTapGhostBadge:(id)sender {
-    return;
-}
-
-- (void)titleViewControllerWillToggleAccountTray:(id)sender on:(BOOL)on {
     return;
 }
 
@@ -369,7 +333,6 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
     UIView *selfView = (UIView *)self;
     selfView.hidden = YES;
     selfView.userInteractionEnabled = NO;
-    [selfView removeFromSuperview];
 }
 
 %end
@@ -566,26 +529,9 @@ sponsoredSupportConfiguration:(id)a13
 
 %hook UIViewController
 
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-    NSString *clsName = NSStringFromClass([self class]);
-    if ([clsName containsString:@"Settings"] || [clsName containsString:@"Settings2"] || [clsName containsString:@"HostingController"]) {
-        SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
-    }
-}
-
-- (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    NSString *clsName = NSStringFromClass([self class]);
-    if ([clsName containsString:@"Settings"] || [clsName containsString:@"Settings2"] || [clsName containsString:@"HostingController"]) {
-        SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
-    }
-}
-
 - (void)viewDidLayoutSubviews {
     %orig;
     NSString *clsName = NSStringFromClass([self class]);
-    // Profile page navigation bar: disable title view (username tap)
     if ([clsName containsString:@"Profile"] || [clsName containsString:@"GizmoProfile"]) {
         UIView *titleView = ((UIViewController *)self).navigationItem.titleView;
         if (titleView && titleView.userInteractionEnabled) {
@@ -595,7 +541,6 @@ sponsoredSupportConfiguration:(id)a13
             }
         }
     }
-    // Settings pages: purge any Add Account, Logout or Accounts Center cells/buttons
     if ([clsName containsString:@"Settings"] || [clsName containsString:@"Settings2"] || [clsName containsString:@"HostingController"]) {
         SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
     }
@@ -680,23 +625,19 @@ extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
     dispatch_once(&onceToken, ^{
         SPKLog(@"AccountLock", @"Installing AccountLock hooks...");
 
-        // 1. Settings navigation plugins
         Class logoutPluginCls = SPKResolveIGClass(@"IGLogoutS2NavigationPlugin", @"IGLogoutS2NavigationPlugin");
         Class addPluginCls = SPKResolveIGClass(@"IGAddAccountS2NavigationPlugin", @"IGAddAccountS2NavigationPlugin");
         Class addProPluginCls = SPKResolveIGClass(@"IGAddNewProfessionalAccountS2NavigationPlugin", @"IGAddNewProfessionalAccountS2NavigationPlugin");
-        Class accountsCenterPluginCls = SPKResolveIGClass(@"IGAccountsCenterS2NavigationPlugin", @"IGAccountsCenterS2NavigationPlugin");
         Class facepileCls = SPKResolveIGClass(@"IGAccountsCenterHorizontalFacepileView", @"IGAccountsCenterHorizontalFacepileView");
 
-        if (logoutPluginCls || addPluginCls || addProPluginCls || accountsCenterPluginCls || facepileCls) {
+        if (logoutPluginCls || addPluginCls || addProPluginCls || facepileCls) {
             %init(SPKSettingsPluginsLockHooks,
                   IGLogoutS2NavigationPlugin = logoutPluginCls,
                   IGAddAccountS2NavigationPlugin = addPluginCls,
                   IGAddNewProfessionalAccountS2NavigationPlugin = addProPluginCls,
-                  IGAccountsCenterS2NavigationPlugin = accountsCenterPluginCls,
                   IGAccountsCenterHorizontalFacepileView = facepileCls);
         }
 
-        // 2. Profile title lock hooks
         Class swiftTitleVCCls = SPKResolveIGClass(@"IGProfileTitleViewKit.IGProfileTitleViewController", @"_TtC21IGProfileTitleViewKit28IGProfileTitleViewController");
         Class profileTitleCls = SPKResolveIGClass(@"IGProfileTitleViewController", @"IGProfileTitleViewController");
         Class titleButtonCls = SPKResolveIGClass(@"IGProfileTitleButton", @"IGProfileTitleButton");
@@ -714,7 +655,6 @@ extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
                   IGAccountTrayCollectionViewCell = trayCellCls);
         }
 
-        // 3. Core account switcher hooks
         Class accountSwitcherCls = SPKResolveIGClass(@"IGAccountSwitcher", @"IGAccountSwitcher");
         Class addManagerCls = SPKResolveIGClass(@"IGAddAccountManager", @"IGAddAccountManager");
         Class addSheetCls = SPKResolveIGClass(@"IGAddAccountSheetViewController", @"IGAddAccountSheetViewController");
@@ -732,7 +672,6 @@ extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
                   IGURLHandler = urlHandlerCls);
         }
 
-        // 4. UIKit general layout & touch purge hooks
         %init(SPKGeneralLockUIHooks);
     });
 }
