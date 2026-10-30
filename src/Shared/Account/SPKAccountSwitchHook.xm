@@ -221,11 +221,12 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 
 - (void)layoutSubviews {
     %orig;
-    for (UIView *sub in self.subviews) {
+    UIView *selfView = (UIView *)self;
+    for (UIView *sub in selfView.subviews) {
         if ([sub isKindOfClass:[UIButton class]]) {
             UIButton *btn = (UIButton *)sub;
             // The username/account switcher button is situated away from the trailing menu edge (+ and ≡)
-            if (btn.frame.origin.x < (self.bounds.size.width - 100)) {
+            if (btn.frame.origin.x < (selfView.bounds.size.width - 100)) {
                 btn.userInteractionEnabled = NO;
                 for (UIGestureRecognizer *g in [btn.gestureRecognizers copy]) {
                     [btn removeGestureRecognizer:g];
@@ -267,19 +268,19 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 
 - (void)loadView {
     %orig;
-    self.view.hidden = YES;
-    self.view.userInteractionEnabled = NO;
+    ((UIViewController *)self).view.hidden = YES;
+    ((UIViewController *)self).view.userInteractionEnabled = NO;
 }
 
 - (void)viewDidLoad {
     %orig;
-    self.view.hidden = YES;
-    self.view.userInteractionEnabled = NO;
+    ((UIViewController *)self).view.hidden = YES;
+    ((UIViewController *)self).view.userInteractionEnabled = NO;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [((UIViewController *)self) dismissViewControllerAnimated:NO completion:nil];
 }
 
 %end
@@ -289,19 +290,19 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 
 - (void)loadView {
     %orig;
-    self.view.hidden = YES;
-    self.view.userInteractionEnabled = NO;
+    ((UIViewController *)self).view.hidden = YES;
+    ((UIViewController *)self).view.userInteractionEnabled = NO;
 }
 
 - (void)viewDidLoad {
     %orig;
-    self.view.hidden = YES;
-    self.view.userInteractionEnabled = NO;
+    ((UIViewController *)self).view.hidden = YES;
+    ((UIViewController *)self).view.userInteractionEnabled = NO;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [((UIViewController *)self) dismissViewControllerAnimated:NO completion:nil];
 }
 
 %end
@@ -311,19 +312,19 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 
 - (void)loadView {
     %orig;
-    self.view.hidden = YES;
-    self.view.userInteractionEnabled = NO;
+    ((UIViewController *)self).view.hidden = YES;
+    ((UIViewController *)self).view.userInteractionEnabled = NO;
 }
 
 - (void)viewDidLoad {
     %orig;
-    self.view.hidden = YES;
-    self.view.userInteractionEnabled = NO;
+    ((UIViewController *)self).view.hidden = YES;
+    ((UIViewController *)self).view.userInteractionEnabled = NO;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [((UIViewController *)self) dismissViewControllerAnimated:NO completion:nil];
 }
 
 %end
@@ -411,7 +412,7 @@ sponsoredSupportConfiguration:(id)a13
     NSString *clsName = NSStringFromClass([self class]);
     // Profile page navigation bar: disable title view (username tap)
     if ([clsName containsString:@"Profile"] || [clsName containsString:@"GizmoProfile"]) {
-        UIView *titleView = self.navigationItem.titleView;
+        UIView *titleView = ((UIViewController *)self).navigationItem.titleView;
         if (titleView && titleView.userInteractionEnabled) {
             titleView.userInteractionEnabled = NO;
             for (UIGestureRecognizer *g in [titleView.gestureRecognizers copy]) {
@@ -421,7 +422,7 @@ sponsoredSupportConfiguration:(id)a13
     }
     // Settings pages: purge any Add Account, Logout or Accounts Center cells/buttons
     if ([clsName containsString:@"Settings"] || [clsName containsString:@"Settings2"]) {
-        SPKPurgeBlockedElementsInView(self.view);
+        SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
     }
 }
 
@@ -431,11 +432,12 @@ sponsoredSupportConfiguration:(id)a13
 
 - (void)layoutSubviews {
     %orig;
-    if (SPKViewContainsBlockedText(self)) {
-        self.hidden = YES;
-        self.alpha = 0.0;
-        self.userInteractionEnabled = NO;
-        self.contentView.hidden = YES;
+    if (SPKViewContainsBlockedText((UIView *)self)) {
+        UICollectionViewCell *cell = (UICollectionViewCell *)self;
+        cell.hidden = YES;
+        cell.alpha = 0.0;
+        cell.userInteractionEnabled = NO;
+        cell.contentView.hidden = YES;
     }
 }
 
@@ -445,11 +447,12 @@ sponsoredSupportConfiguration:(id)a13
 
 - (void)layoutSubviews {
     %orig;
-    if (SPKViewContainsBlockedText(self)) {
-        self.hidden = YES;
-        self.alpha = 0.0;
-        self.userInteractionEnabled = NO;
-        self.contentView.hidden = YES;
+    if (SPKViewContainsBlockedText((UIView *)self)) {
+        UITableViewCell *cell = (UITableViewCell *)self;
+        cell.hidden = YES;
+        cell.alpha = 0.0;
+        cell.userInteractionEnabled = NO;
+        cell.contentView.hidden = YES;
     }
 }
 
