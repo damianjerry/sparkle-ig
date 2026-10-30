@@ -12,33 +12,15 @@ typedef NS_ENUM(NSInteger, SPKFeedFilterSurface) {
 };
 
 static BOOL SPKShouldHideAdsForSurface(SPKFeedFilterSurface surface) {
-    switch (surface) {
-    case SPKFeedFilterSurfaceFeed:
-    case SPKFeedFilterSurfaceOther:
-        return [SPKUtils getBoolPref:@"general_hide_ads_feed"];
-    case SPKFeedFilterSurfaceReels:
-        return [SPKUtils getBoolPref:@"general_hide_ads_reels"];
-    case SPKFeedFilterSurfaceExplore:
-        return [SPKUtils getBoolPref:@"general_hide_ads_explore"];
-    }
-    return NO;
+    return YES;
 }
 
 static BOOL SPKShouldHideSuggestedAccountsForSurface(SPKFeedFilterSurface surface) {
-    switch (surface) {
-    case SPKFeedFilterSurfaceFeed:
-        return [SPKUtils getBoolPref:@"general_hide_suggested_users_feed"];
-    case SPKFeedFilterSurfaceReels:
-        return [SPKUtils getBoolPref:@"general_hide_suggested_users_reels"];
-    case SPKFeedFilterSurfaceExplore:
-    case SPKFeedFilterSurfaceOther:
-        return NO;
-    }
-    return NO;
+    return YES;
 }
 
 static BOOL SPKShouldHideStoryAds(void) {
-    return [SPKUtils getBoolPref:@"general_hide_ads_stories"];
+    return YES;
 }
 
 // IG 436+ moved this model into the IGInFeedStories Swift module (mangled runtime

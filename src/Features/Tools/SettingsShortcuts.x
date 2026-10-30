@@ -53,12 +53,7 @@ static void SPKFireShortcutHaptic(void) {
 }
 
 - (void)handleProfileMoreLongPress:(UILongPressGestureRecognizer *)sender {
-    if (sender.state != UIGestureRecognizerStateBegan)
-        return;
-
-    SPKLog(@"General", @"[Sparkle] Tweak settings gesture activated");
-    SPKFireShortcutHaptic();
-    [SPKUtils showSettingsVC:sender.view.window];
+    return;
 }
 @end
 
@@ -67,52 +62,19 @@ static BOOL SPKIsProfileMoreButton(UIView *view) {
 }
 
 static void SPKAddProfileSettingsLongPressToView(UIView *view) {
-    if (!view)
-        return;
-    for (UIGestureRecognizer *gesture in view.gestureRecognizers) {
-        if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
-            continue;
-        if (objc_getAssociatedObject(gesture, kSPKProfileMoreSettingsLongPressAssocKey)) {
-            return;
-        }
-    }
-
-    SPKLog(@"General", @"[Sparkle] Adding tweak settings long press gesture recognizer to %@ id=%@ label=%@",
-           NSStringFromClass(view.class),
-           view.accessibilityIdentifier,
-           view.accessibilityLabel);
-
-    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:[SPKSettingsShortcutTarget sharedTarget]
-                                                                                            action:@selector(handleProfileMoreLongPress:)];
-    longPress.minimumPressDuration = kSPKProfileMoreSettingsLongPressDuration;
-    longPress.cancelsTouchesInView = YES;
-    longPress.delaysTouchesBegan = YES;
-    longPress.delaysTouchesEnded = YES;
-
-    for (UIGestureRecognizer *existing in view.gestureRecognizers) {
-        [existing requireGestureRecognizerToFail:longPress];
-    }
-
-    [view addGestureRecognizer:longPress];
-    objc_setAssociatedObject(longPress, kSPKProfileMoreSettingsLongPressAssocKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return;
 }
 
 static void (*orig_spkProfileMoreDidMoveToWindow)(id, SEL);
 static void SPKHookedProfileMoreDidMoveToWindow(id self, SEL _cmd) {
     if (orig_spkProfileMoreDidMoveToWindow)
         orig_spkProfileMoreDidMoveToWindow(self, _cmd);
-    if ([self isKindOfClass:[UIView class]] && SPKIsProfileMoreButton((UIView *)self)) {
-        SPKAddProfileSettingsLongPressToView((UIView *)self);
-    }
 }
 
 static void (*orig_spkProfileMoreLayoutSubviews)(id, SEL);
 static void SPKHookedProfileMoreLayoutSubviews(id self, SEL _cmd) {
     if (orig_spkProfileMoreLayoutSubviews)
         orig_spkProfileMoreLayoutSubviews(self, _cmd);
-    if ([self isKindOfClass:[UIView class]] && SPKIsProfileMoreButton((UIView *)self)) {
-        SPKAddProfileSettingsLongPressToView((UIView *)self);
-    }
 }
 
 static BOOL SPKProfileMoreShortcutHooksInstalled = NO;
@@ -120,33 +82,7 @@ static BOOL SPKProfileMoreShortcutRetryScheduled = NO;
 static NSInteger SPKProfileMoreShortcutInstallAttempts = 0;
 
 static void SPKInstallProfileMoreShortcutHooks(void) {
-    if (SPKProfileMoreShortcutHooksInstalled)
-        return;
-
-    SPKProfileMoreShortcutInstallAttempts += 1;
-    Class buttonClass = objc_getClass("IGProfileNavigation.IGBadgedNavigationButton");
-    if (!buttonClass)
-        buttonClass = objc_getClass("_TtC19IGProfileNavigation24IGBadgedNavigationButton");
-    if (!buttonClass)
-        buttonClass = objc_getClass("IGBadgedNavigationButton");
-    if (!buttonClass) {
-        SPKLog(@"General", @"[Sparkle] Profile more settings shortcut hook target unavailable attempt=%ld",
-               (long)SPKProfileMoreShortcutInstallAttempts);
-        if (!SPKProfileMoreShortcutRetryScheduled &&
-            SPKProfileMoreShortcutInstallAttempts < kSPKProfileMoreShortcutMaxInstallAttempts) {
-            SPKProfileMoreShortcutRetryScheduled = YES;
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.75 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                SPKProfileMoreShortcutRetryScheduled = NO;
-                SPKInstallProfileMoreShortcutHooks();
-            });
-        }
-        return;
-    }
-
-    MSHookMessageEx(buttonClass, @selector(didMoveToWindow), (IMP)SPKHookedProfileMoreDidMoveToWindow, (IMP *)&orig_spkProfileMoreDidMoveToWindow);
-    MSHookMessageEx(buttonClass, @selector(layoutSubviews), (IMP)SPKHookedProfileMoreLayoutSubviews, (IMP *)&orig_spkProfileMoreLayoutSubviews);
-    SPKProfileMoreShortcutHooksInstalled = YES;
-    SPKLog(@"General", @"[Sparkle] Profile more settings shortcut hooks class=%@", NSStringFromClass(buttonClass));
+    return;
 }
 
 static NSString *SPKGalleryShortcutTabIdentifier(void) {
@@ -231,57 +167,25 @@ static BOOL SPKTabHiddenForIdentifier(NSString *identifier) {
 }
 
 static NSString *SPKResolvedSettingsShortcutTabIdentifier(void) {
-    if (![SPKUtils getBoolPref:@"tools_settings_shortcut"])
-        return nil;
-
-    NSArray<NSString *> *priority = @[ @"mainfeed-tab", @"reels-tab", @"direct-inbox-tab", @"camera-tab", @"explore-tab", @"profile-tab" ];
-    for (NSString *identifier in priority) {
-        if (SPKTabHiddenForIdentifier(identifier))
-            continue;
-        return identifier;
-    }
     return nil;
 }
 
 static NSString *SPKResolvedGalleryShortcutTabIdentifier(void) {
-    NSString *preferred = SPKGalleryShortcutTabIdentifier();
-    if (preferred.length == 0 || [preferred isEqualToString:kSPKGalleryQuickAccessDisabledValue])
-        return nil;
-
-    NSString *settingsHost = SPKResolvedSettingsShortcutTabIdentifier();
-    if (![preferred isEqualToString:settingsHost]) {
-        return preferred;
-    }
-
-    // Clash! Settings wins on the preferred tab.
-    // Gallery falls back to the next available visible tab that isn't settingsHost.
-    NSArray<NSString *> *priority = @[ @"mainfeed-tab", @"reels-tab", @"direct-inbox-tab", @"camera-tab", @"explore-tab", @"profile-tab" ];
-    for (NSString *identifier in priority) {
-        if (SPKTabHiddenForIdentifier(identifier))
-            continue;
-        if ([identifier isEqualToString:settingsHost])
-            continue;
-        return identifier;
-    }
-
     return nil;
 }
 
 static BOOL SPKTabIdentifierMatchesGalleryShortcut(NSString *identifier, NSString *label) {
-    return SPKTabButtonMatchesTarget(identifier, label, SPKResolvedGalleryShortcutTabIdentifier());
+    return NO;
 }
 
-// The accessibility label is localized, so it can never be compared against an
-// English string. Identity comes from the identifier match alone.
 static BOOL SPKShouldReplaceProfileTabLongPress(NSString *identifier, NSString *label) {
-    return [SPKResolvedGalleryShortcutTabIdentifier() isEqualToString:@"profile-tab"] &&
-           SPKTabButtonMatchesTarget(identifier, label, @"profile-tab");
+    return NO;
 }
 
 // Show Sparkle tweak settings by holding on the settings/more icon under profile for ~1 second
 %group SPKSettingsShortcutsHooks
 
-// Quick access to tweak settings by holding on home tab button
+// Tab bar button hook: disables settings shortcuts and locks profile tab from opening account switcher
 %hook IGTabBarButton
 
 - (void)setAccessibilityIdentifier:(NSString *)identifier {
@@ -294,120 +198,91 @@ static BOOL SPKShouldReplaceProfileTabLongPress(NSString *identifier, NSString *
     [self setNeedsLayout];
 }
 
+- (void)addGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer {
+    NSString *identifier = self.accessibilityIdentifier ?: @"";
+    NSString *label = self.accessibilityLabel ?: @"";
+    BOOL isProfileTab = [identifier isEqualToString:@"profile-tab"] ||
+                        [identifier containsString:@"profile"] ||
+                        [label.lowercaseString containsString:@"profile"] ||
+                        [identifier containsString:@"tab_avatar"];
+
+    // Single Account Lock: Block Instagram from attaching account switcher long press to profile tab
+    if (isProfileTab && [gestureRecognizer isKindOfClass:[UILongPressGestureRecognizer class]]) {
+        return;
+    }
+
+    // Block any tweak settings or gallery shortcut gestures
+    if (objc_getAssociatedObject(gestureRecognizer, kSPKHomeTabSettingsLongPressAssocKey) ||
+        objc_getAssociatedObject(gestureRecognizer, kSPKProfileMoreSettingsLongPressAssocKey) ||
+        objc_getAssociatedObject(gestureRecognizer, kSPKGalleryTabLongPressAssocKey)) {
+        return;
+    }
+
+    %orig;
+}
+
 - (void)layoutSubviews {
     %orig;
     SPK_PERF_SCOPE(@"SettingsShortcuts.layoutSubviews");
 
+    // Remove any tweak shortcuts
+    [self spk_removeSettingsLongPressIfNeeded];
+    [self spk_removeGalleryLongPressIfNeeded];
+
+    // Single Account Lock: Remove profile account switcher long press if attached
     NSString *identifier = self.accessibilityIdentifier ?: @"";
     NSString *label = self.accessibilityLabel ?: @"";
-
-    NSString *settingsHost = SPKResolvedSettingsShortcutTabIdentifier();
-    BOOL hostsSettings = settingsHost && SPKTabButtonMatchesTarget(identifier, label, settingsHost);
-    BOOL matchesGallery = SPKTabIdentifierMatchesGalleryShortcut(identifier, label);
-
-    if (hostsSettings) {
-        [self spk_removeGalleryLongPressIfNeeded];
-        [self spk_addLongPressWithAction:@selector(handleHomeTabLongPress:) marker:kSPKHomeTabSettingsLongPressAssocKey minimumDuration:kSPKHomeTabLongPressDuration];
-
-        // Remove Instagram's native long press(es) that compete with ours.
-        // Both have 0.5s duration, and requireGestureRecognizerToFail is
-        // unreliable when durations match — sometimes IG's fires instead.
+    BOOL isProfileTab = [identifier isEqualToString:@"profile-tab"] ||
+                        [identifier containsString:@"profile"] ||
+                        [label.lowercaseString containsString:@"profile"] ||
+                        [identifier containsString:@"tab_avatar"];
+    if (isProfileTab) {
         for (UIGestureRecognizer *g in [self.gestureRecognizers copy]) {
-            if (![g isKindOfClass:[UILongPressGestureRecognizer class]])
-                continue;
-            if (objc_getAssociatedObject(g, kSPKHomeTabSettingsLongPressAssocKey))
-                continue;
-            if (objc_getAssociatedObject(g, kSPKGalleryTabLongPressAssocKey))
-                continue;
-            [self removeGestureRecognizer:g];
+            if ([g isKindOfClass:[UILongPressGestureRecognizer class]]) {
+                [self removeGestureRecognizer:g];
+            }
         }
-    } else {
-        [self spk_removeSettingsLongPressIfNeeded];
-    }
-
-    if (matchesGallery && !hostsSettings) {
-        if (SPKShouldReplaceProfileTabLongPress(identifier, label)) {
-            [self spk_removeProfileAccountPickerLongPressIfNeeded];
-        }
-        [self spk_addLongPressWithAction:@selector(handleDirectInboxTabLongPress:) marker:kSPKGalleryTabLongPressAssocKey minimumDuration:kSPKGalleryTabLongPressDuration];
-    } else {
-        [self spk_removeGalleryLongPressIfNeeded];
     }
 }
 
 %new - (void)spk_addLongPressWithAction:(SEL)action marker:(const void *)marker minimumDuration:(NSTimeInterval)minimumDuration {
-for (UIGestureRecognizer *gesture in self.gestureRecognizers) {
-    if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
-        continue;
-    if (objc_getAssociatedObject(gesture, marker)) {
-        return;
-    }
-}
-
-UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:action];
-longPress.minimumPressDuration = minimumDuration;
-BOOL shouldCancel = (marker == kSPKGalleryTabLongPressAssocKey || marker == kSPKHomeTabSettingsLongPressAssocKey);
-longPress.cancelsTouchesInView = shouldCancel;
-longPress.delaysTouchesBegan = shouldCancel;
-longPress.delaysTouchesEnded = shouldCancel;
-
-for (UIGestureRecognizer *existing in self.gestureRecognizers) {
-    [existing requireGestureRecognizerToFail:longPress];
-}
-
-[self addGestureRecognizer:longPress];
-objc_setAssociatedObject(longPress, marker, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return;
 }
 
 %new - (void)spk_removeProfileAccountPickerLongPressIfNeeded {
-for (UIGestureRecognizer *gesture in [self.gestureRecognizers copy]) {
-    if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
-        continue;
-    if (objc_getAssociatedObject(gesture, kSPKGalleryTabLongPressAssocKey))
-        continue;
-
-    UILongPressGestureRecognizer *longPress = (UILongPressGestureRecognizer *)gesture;
-    if (fabs(longPress.minimumPressDuration - 0.5) > 0.01)
-        continue;
-
-    [self removeGestureRecognizer:gesture];
-}
+    for (UIGestureRecognizer *gesture in [self.gestureRecognizers copy]) {
+        if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
+            continue;
+        [self removeGestureRecognizer:gesture];
+    }
 }
 
 %new - (void)spk_removeGalleryLongPressIfNeeded {
-for (UIGestureRecognizer *gesture in [self.gestureRecognizers copy]) {
-    if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
-        continue;
-    if (objc_getAssociatedObject(gesture, kSPKGalleryTabLongPressAssocKey)) {
-        [self removeGestureRecognizer:gesture];
+    for (UIGestureRecognizer *gesture in [self.gestureRecognizers copy]) {
+        if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
+            continue;
+        if (objc_getAssociatedObject(gesture, kSPKGalleryTabLongPressAssocKey)) {
+            [self removeGestureRecognizer:gesture];
+        }
     }
-}
 }
 
 %new - (void)spk_removeSettingsLongPressIfNeeded {
-for (UIGestureRecognizer *gesture in [self.gestureRecognizers copy]) {
-    if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
-        continue;
-    if (objc_getAssociatedObject(gesture, kSPKHomeTabSettingsLongPressAssocKey)) {
-        [self removeGestureRecognizer:gesture];
+    for (UIGestureRecognizer *gesture in [self.gestureRecognizers copy]) {
+        if (![gesture isKindOfClass:[UILongPressGestureRecognizer class]])
+            continue;
+        if (objc_getAssociatedObject(gesture, kSPKHomeTabSettingsLongPressAssocKey)) {
+            [self removeGestureRecognizer:gesture];
+        }
     }
-}
 }
 
 %new - (void)handleHomeTabLongPress:(UILongPressGestureRecognizer *)sender {
-    if (sender.state != UIGestureRecognizerStateBegan)
-        return;
-
-    SPKFireShortcutHaptic();
-    [SPKUtils showSettingsVC:[self window]];
+    return;
 }
 
 %new - (void)handleDirectInboxTabLongPress:(UILongPressGestureRecognizer *)sender {
-if (sender.state != UIGestureRecognizerStateBegan)
     return;
-
-SPKFireShortcutHaptic();
-[SPKGalleryViewController presentGallery];
 }
 %end
 
@@ -421,35 +296,10 @@ SPKFireShortcutHaptic();
         btn = [self valueForKey:@"messageButton"];
     }
     if (btn) {
-        BOOL shouldAdd = SPKIsMessagesOnlyMode();
-        if (shouldAdd) {
-            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:[SPKSettingsShortcutTarget sharedTarget]
-                                                                                                     action:@selector(handleProfileMoreLongPress:)];
-            longPress.minimumPressDuration = kSPKProfileMoreSettingsLongPressDuration;
-            longPress.cancelsTouchesInView = YES;
-            longPress.delaysTouchesBegan = YES;
-            longPress.delaysTouchesEnded = YES;
-
-            for (UIGestureRecognizer *gesture in [btn.gestureRecognizers copy]) {
-                if ([gesture isKindOfClass:[UILongPressGestureRecognizer class]] &&
-                    objc_getAssociatedObject(gesture, kSPKProfileMoreSettingsLongPressAssocKey)) {
-                    [btn removeGestureRecognizer:gesture];
-                }
-            }
-
-            for (UIGestureRecognizer *existing in btn.gestureRecognizers) {
-                [existing requireGestureRecognizerToFail:longPress];
-            }
-
-            [btn addGestureRecognizer:longPress];
-            objc_setAssociatedObject(longPress, kSPKProfileMoreSettingsLongPressAssocKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        } else {
-            // Clean up gesture if it shouldn't be here
-            for (UIGestureRecognizer *gesture in [btn.gestureRecognizers copy]) {
-                if ([gesture isKindOfClass:[UILongPressGestureRecognizer class]] &&
-                    objc_getAssociatedObject(gesture, kSPKProfileMoreSettingsLongPressAssocKey)) {
-                    [btn removeGestureRecognizer:gesture];
-                }
+        for (UIGestureRecognizer *gesture in [btn.gestureRecognizers copy]) {
+            if ([gesture isKindOfClass:[UILongPressGestureRecognizer class]] &&
+                objc_getAssociatedObject(gesture, kSPKProfileMoreSettingsLongPressAssocKey)) {
+                [btn removeGestureRecognizer:gesture];
             }
         }
     }

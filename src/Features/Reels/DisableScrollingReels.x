@@ -46,9 +46,6 @@
 %end
 
 void SPKInstallDisableScrollingReelsHooksIfEnabled(void) {
-    if (![SPKUtils getBoolPref:@"reels_disable_scrolling"])
-        return;
-
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         %init(SPKDisableScrollingReelsHooks);

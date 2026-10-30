@@ -3,23 +3,23 @@
 #import "../../App/SPKPerfMeter.h"
 
 static inline BOOL SPKHideMetaAIDirect(void) {
-    return [SPKUtils getBoolPref:@"general_hide_meta_ai_msgs"];
+    return YES;
 }
 
 static inline BOOL SPKHideMetaAIExplore(void) {
-    return [SPKUtils getBoolPref:@"general_hide_meta_ai_explore"];
+    return YES;
 }
 
 static inline BOOL SPKHideMetaAIComments(void) {
-    return [SPKUtils getBoolPref:@"general_hide_meta_ai_comments"];
+    return YES;
 }
 
 static inline BOOL SPKHideMetaAICreation(void) {
-    return [SPKUtils getBoolPref:@"general_hide_meta_ai_creation"];
+    return YES;
 }
 
 static inline BOOL SPKHideMetaAIGlobal(void) {
-    return [SPKUtils getBoolPref:@"general_hide_meta_ai_global"];
+    return YES;
 }
 
 // Drops the gen-AI rows from a Direct message long-press menu.

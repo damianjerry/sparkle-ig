@@ -12,7 +12,7 @@
 static NSInteger const IGHomeFeedPickerMenuItemFollowing = 5;
 
 static BOOL SPKFollowingFeedEnabled(void) {
-    return [[SPKUtils getStringPref:@"feed_mode"] isEqualToString:@"following"];
+    return YES;
 }
 
 %group SPKFollowingFeedHooks

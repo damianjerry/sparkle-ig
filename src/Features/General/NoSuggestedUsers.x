@@ -2,23 +2,23 @@
 #import "../../Utils.h"
 
 static inline BOOL SPKHideFeedSuggestedUsers(void) {
-    return [SPKUtils getBoolPref:@"general_hide_suggested_users_feed"];
+    return YES;
 }
 
 static inline BOOL SPKHideProfileSuggestedUsers(void) {
-    return [SPKUtils getBoolPref:@"general_hide_suggested_users_profile"];
+    return YES;
 }
 
 static inline BOOL SPKHideActivitySuggestedUsers(void) {
-    return [SPKUtils getBoolPref:@"general_hide_suggested_users_activity"];
+    return YES;
 }
 
 static inline BOOL SPKHideFollowListSuggestedUsers(void) {
-    return [SPKUtils getBoolPref:@"general_hide_suggested_users_follow_lists"];
+    return YES;
 }
 
 static inline BOOL SPKHideSubscriptionSuggestedUsers(void) {
-    return [SPKUtils getBoolPref:@"general_hide_suggested_users_subscriptions"];
+    return YES;
 }
 
 %group SPKNoSuggestedUsersHooks

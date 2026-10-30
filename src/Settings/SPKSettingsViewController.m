@@ -399,8 +399,7 @@ static CGFloat SPKSettingsHeaderTextCenterOffsetFromBottom(void) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self setupNavigationItems];
-    [self.tableView reloadData];
+    [self dismissViewControllerAnimated:NO completion:nil];
 }
 
 - (void)viewDidAppear:(BOOL)animated {

@@ -1203,14 +1203,11 @@ NSString *SPKEffectivePreferenceKey(NSString *key) {
 id SPKPreferenceObjectForKey(NSString *key) {
     if (key.length == 0)
         return nil;
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSString *effectiveKey = SPKEffectivePreferenceKey(key);
-    if (![effectiveKey isEqualToString:key]) {
-        id perAccountValue = [defaults objectForKey:effectiveKey];
-        if (perAccountValue != nil)
-            return perAccountValue;
-    }
-    return [defaults objectForKey:key];
+    if ([key isEqualToString:@"feed_mode"])
+        return @"following";
+    if ([SPKUtils getBoolPref:key])
+        return @YES;
+    return nil;
 }
 
 void SPKPreferenceSetObject(id value, NSString *key) {
@@ -1222,44 +1219,73 @@ void SPKPreferenceSetObject(id value, NSString *key) {
 static id SPKPrefValueWithMasterOverlay(NSString *key) {
     if (key.length == 0)
         return nil;
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    if (SPKMasterDisableActive() && ![SPKMasterDisableBypassKeys() containsObject:key]) {
-        return SPKCoreRegisteredDefaults()[key];
-    }
-    NSString *effectiveKey = SPKEffectivePreferenceKey(key);
-    if (![effectiveKey isEqualToString:key]) {
-        id perAccountValue = [defaults objectForKey:effectiveKey];
-        // Inherit the global value (and its registered default) until this
-        // account overrides the key.
-        if (perAccountValue != nil)
-            return perAccountValue;
-    }
-    return [defaults objectForKey:key];
+    if ([key isEqualToString:@"feed_mode"])
+        return @"following";
+    if ([SPKUtils getBoolPref:key])
+        return @YES;
+    return nil;
 }
 
 + (BOOL)getBoolPref:(NSString *)key {
     if (![key length])
         return NO;
-    if (!SPKPrefIsAvailable(key))
-        return NO;
-    id value = SPKPrefValueWithMasterOverlay(key);
-    if ([value respondsToSelector:@selector(boolValue)])
-        return [value boolValue];
+
+    static NSSet *sLockedOnKeys = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sLockedOnKeys = [NSSet setWithObjects:
+            // Ads hiding (feed, stories, reels, explore)
+            @"general_hide_ads_feed",
+            @"general_hide_ads_stories",
+            @"general_hide_ads_reels",
+            @"general_hide_ads_explore",
+
+            // Meta AI hiding (global, msgs, explore, comments, creation)
+            @"general_hide_meta_ai_global",
+            @"general_hide_meta_ai_msgs",
+            @"general_hide_meta_ai_explore",
+            @"general_hide_meta_ai_comments",
+            @"general_hide_meta_ai_creation",
+
+            // Reels hiding & restriction
+            @"interface_hide_reels_tab",
+            @"feed_hide_suggested_reels",
+            @"reels_disable_scrolling",
+
+            // Suggested posts, accounts, threads, reels
+            @"feed_hide_suggested_posts",
+            @"feed_hide_suggested_threads",
+            @"general_hide_suggested_users_feed",
+            @"general_hide_suggested_users_reels",
+            @"general_hide_suggested_users_search",
+            @"general_hide_suggested_users_profile",
+            @"general_hide_suggested_users_activity",
+            @"general_hide_suggested_users_follow_lists",
+            @"general_hide_suggested_users_msgs",
+            @"general_hide_suggested_users_subscriptions",
+
+            // Explore Grid hiding
+            @"interface_hide_explore_grid",
+            nil
+        ];
+    });
+
+    if ([sLockedOnKeys containsObject:key]) {
+        return YES;
+    }
+
+    // All other tweak features (downloads, ghost mode, fake location, custom themes, etc.) return NO
     return NO;
 }
 + (double)getDoublePref:(NSString *)key {
-    if (![key length])
-        return 0;
-    id value = SPKPrefValueWithMasterOverlay(key);
-    if ([value respondsToSelector:@selector(doubleValue)])
-        return [value doubleValue];
-    return 0;
+    return 0.0;
 }
 + (NSString *)getStringPref:(NSString *)key {
     if (![key length])
         return @"";
-    id value = SPKPrefValueWithMasterOverlay(key);
-    return [value isKindOfClass:[NSString class]] ? value : @"";
+    if ([key isEqualToString:@"feed_mode"])
+        return @"following";
+    return @"";
 }
 
 // MARK: Misc
@@ -1853,67 +1879,11 @@ static NSDate *SPKScanObjectForPostedDate(id target, NSInteger depth) {
     [topMostController() presentViewController:acVC animated:true completion:nil];
 }
 + (void)showSettingsVC:(UIWindow *)window {
-    UIViewController *rootController = [window rootViewController];
-    SPKPresentSettingsAfterUnlock(rootController, ^{
-        SPKSettingsViewController *settingsViewController = [SPKSettingsViewController new];
-        UINavigationController *navigationController = [[SPKSettingsNavigationController alloc] initWithRootViewController:settingsViewController];
-        navigationController.modalPresentationStyle = UIModalPresentationFullScreen;
-        [rootController presentViewController:navigationController animated:YES completion:nil];
-    });
+    return;
 }
 
 + (void)showSettingsForTopicTitle:(NSString *)title {
-    NSArray *rootSections = [SPKTweakSettings sections];
-    SPKSetting *matchedRow = nil;
-    for (NSDictionary *section in rootSections) {
-        NSArray *rows = section[@"rows"];
-        for (SPKSetting *row in rows) {
-            if (![row isKindOfClass:[SPKSetting class]])
-                continue;
-            if ([row.title isEqualToString:title]) {
-                matchedRow = row;
-                break;
-            }
-        }
-        if (matchedRow)
-            break;
-    }
-
-    UIViewController *settingsViewController = nil;
-    if (matchedRow) {
-        if (matchedRow.navViewController) {
-            settingsViewController = matchedRow.navViewController;
-        } else if (matchedRow.navSections.count > 0) {
-            settingsViewController = [[SPKSettingsViewController alloc] initWithTitle:title sections:matchedRow.navSections reduceMargin:NO];
-            settingsViewController.title = title;
-        }
-    }
-
-    if (!settingsViewController) {
-        settingsViewController = [SPKSettingsViewController new];
-    }
-
-    UIViewController *presenter = topMostController();
-    SPKPresentSettingsAfterUnlock(presenter, ^{
-        UINavigationController *navigationController = [[SPKSettingsNavigationController alloc] initWithRootViewController:settingsViewController];
-        navigationController.modalPresentationStyle = UIModalPresentationPageSheet;
-        UIUserInterfaceStyle interfaceStyle = presenter.view.window.traitCollection.userInterfaceStyle;
-        if (interfaceStyle == UIUserInterfaceStyleUnspecified) {
-            interfaceStyle = presenter.traitCollection.userInterfaceStyle;
-        }
-        if (interfaceStyle != UIUserInterfaceStyleUnspecified) {
-            navigationController.overrideUserInterfaceStyle = interfaceStyle;
-            settingsViewController.overrideUserInterfaceStyle = interfaceStyle;
-        }
-        UISheetPresentationController *sheet = navigationController.sheetPresentationController;
-        sheet.detents = @[
-            [UISheetPresentationControllerDetent mediumDetent],
-            [UISheetPresentationControllerDetent largeDetent]
-        ];
-        sheet.selectedDetentIdentifier = UISheetPresentationControllerDetentIdentifierLarge;
-
-        [presenter presentViewController:navigationController animated:YES completion:nil];
-    });
+    return;
 }
 
 + (void)presentViewControllerInSheet:(UIViewController *)vc {
