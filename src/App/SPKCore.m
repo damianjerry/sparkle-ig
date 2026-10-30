@@ -305,24 +305,11 @@ static NSDictionary *SPKFeatureDefaults(void) {
 }
 
 void SPKCoreRegisterBootstrapDefaults(void) {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        // Before any registration, so renamed keys see only stored values.
-        SPKRunPendingPreferenceMigrations();
-        [[NSUserDefaults standardUserDefaults] registerDefaults:SPKBootstrapDefaults()];
-        SPKMigrateTabConfigurationIfNeeded();
-        SPKStartupMark(@"bootstrap defaults registered");
-    });
+    // No-op in hardcoded locked mode to avoid triggering background UserDefaults sync
 }
 
 void SPKCoreRegisterDefaults(void) {
-    SPKCoreRegisterBootstrapDefaults();
-
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        [[NSUserDefaults standardUserDefaults] registerDefaults:SPKFeatureDefaults()];
-        SPKStartupMark(@"feature defaults registered");
-    });
+    // No-op in hardcoded locked mode
 }
 
 // Returns a merged snapshot of every default the tweak registers (bootstrap +

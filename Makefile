@@ -11,12 +11,12 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = Sparkle
 
-$(TWEAK_NAME)_FILES = $(shell find src -type f \( -iname \*.x -o -iname \*.xm -o -iname \*.m -o -iname \*.swift \)) modules/SPKSideloadFix/fishhook/fishhook.c
+$(TWEAK_NAME)_FILES = $(shell find src modules/SPKSideloadFix/src -type f \( -iname \*.x -o -iname \*.xm -o -iname \*.m -o -iname \*.mm -o -iname \*.swift \)) modules/SPKSideloadFix/fishhook/fishhook.c
 $(TWEAK_NAME)_FRAMEWORKS = UIKit Foundation CoreGraphics CoreLocation MapKit Photos CoreServices SystemConfiguration SafariServices Security QuartzCore AVFoundation AVKit CoreData LocalAuthentication ImageIO UniformTypeIdentifiers Accelerate VisionKit UserNotifications
 $(TWEAK_NAME)_PRIVATE_FRAMEWORKS = Preferences
 $(TWEAK_NAME)_LIBRARIES = sqlite3
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc -Wno-unsupported-availability-guard -Wno-unused-value -Wno-deprecated-declarations -Wno-nullability-completeness -Wno-unused-function -Wno-incompatible-pointer-types
-$(TWEAK_NAME)_CFLAGS += -Isrc/Shared/i18n
+$(TWEAK_NAME)_CFLAGS += -Isrc/Shared/i18n -Imodules/SPKSideloadFix/src -Imodules/SPKSideloadFix/fishhook
 $(TWEAK_NAME)_LOGOSFLAGS = --c warnings=none
 
 STARTUP_PROFILING ?= 0

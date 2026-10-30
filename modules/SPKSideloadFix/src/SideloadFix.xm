@@ -1,6 +1,9 @@
 #import "Header.h"
+#import <dlfcn.h>
+#import <substrate.h>
 
 static NSURL *redirectedAppGroupURL(NSString *groupIdentifier) {
+	if (!groupIdentifier || ![groupIdentifier isKindOfClass:[NSString class]]) return nil;
 	if (![groupIdentifier hasPrefix:@"group"]) return nil;
 
 	if (NSURL *appGroupURL = getAppGroupPathIfExists()) {
@@ -14,6 +17,36 @@ static NSURL *redirectedAppGroupURL(NSString *groupIdentifier) {
 	NSString *fakePath = [documentsPath stringByAppendingPathComponent:groupIdentifier];
 	return [NSURL fileURLWithPath:fakePath];
 }
+
+static NSURL *(*orig_IGAppGroupContainerURL)(void) = NULL;
+static NSURL *hooked_IGAppGroupContainerURL(void) {
+	NSURL *res = orig_IGAppGroupContainerURL ? orig_IGAppGroupContainerURL() : nil;
+	if (!res) {
+		res = redirectedAppGroupURL(@"group.com.burbn.instagram");
+	}
+	return res;
+}
+
+static NSURL *(*orig_IGAppGroupContainerURLWithAppType)(NSInteger) = NULL;
+static NSURL *hooked_IGAppGroupContainerURLWithAppType(NSInteger type) {
+	NSURL *res = orig_IGAppGroupContainerURLWithAppType ? orig_IGAppGroupContainerURLWithAppType(type) : nil;
+	if (!res) {
+		res = redirectedAppGroupURL(@"group.com.burbn.instagram");
+	}
+	return res;
+}
+
+%hook IGProductSaveStatusStore
+
+- (void)prepareIfNeeded {
+	@try {
+		%orig;
+	} @catch (NSException *e) {
+		SPKSideloadLog(@"Caught exception in prepareIfNeeded: %@", e);
+	}
+}
+
+%end
 
 %hook CKContainer
 - (id)_setupWithContainerID:(id)a options:(id)b { return nil; }
@@ -69,3 +102,14 @@ BOOL isAppExtensionProcess(void) {
 	return %orig(suiteName, container);
 }
 %end
+
+%ctor {
+	void *sym = dlsym(RTLD_DEFAULT, "IGAppGroupContainerURL");
+	if (sym) {
+		MSHookFunction(sym, (void *)hooked_IGAppGroupContainerURL, (void **)&orig_IGAppGroupContainerURL);
+	}
+	void *symType = dlsym(RTLD_DEFAULT, "IGAppGroupContainerURLWithAppType");
+	if (symType) {
+		MSHookFunction(symType, (void *)hooked_IGAppGroupContainerURLWithAppType, (void **)&orig_IGAppGroupContainerURLWithAppType);
+	}
+}

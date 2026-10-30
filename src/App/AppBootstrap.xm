@@ -96,14 +96,6 @@ static void SPKScheduleStagedFeatureHooks(void) {
 %hook IGInstagramAppDelegate
 - (_Bool)application:(UIApplication *)application willFinishLaunchingWithOptions:(id)arg2 {
     SPKStartupMark(@"willFinishLaunching begin");
-    SPKCoreRegisterBootstrapDefaults();
-    SPKStabilityGuardBeginLaunch();
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
-    [defaults setBool:[SPKUtils spk_isLiquidGlassEffectivelyEnabled]
-               forKey:@"instagram.override.project.lucent.navigation"];
-    [defaults removeObjectForKey:@"liquid_glass_override_enabled"];
-    [defaults removeObjectForKey:@"IGLiquidGlassOverrideEnabled"];
     SPKCoreInstallLaunchCriticalHooks();
     SPKStartupMark(@"launch critical hooks installed");
 

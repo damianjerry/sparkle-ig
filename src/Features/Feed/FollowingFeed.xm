@@ -36,6 +36,18 @@ static BOOL SPKFollowingFeedEnabled(void) {
 
 %end
 
+%hook IGHomeFeedPickerHelpers
+
++ (BOOL)homeFeedPickerShouldShowFollowingFeed:(id)session {
+    return YES;
+}
+
++ (BOOL)homeFeedPickerShouldShowFollowingFeedAsLatest:(id)session {
+    return YES;
+}
+
+%end
+
 %end // SPKFollowingPickerHooks
 
 %group SPKFollowingDSAHooks
@@ -43,6 +55,16 @@ static BOOL SPKFollowingFeedEnabled(void) {
 %hook IGDSAGatingManager
 
 // Persisted "preferred content lane" (EU DSA): returning 1 = Following.
+- (NSInteger)feedStickyContentLaneSelection {
+    if (!SPKFollowingFeedEnabled())
+        return %orig;
+    return 1;
+}
+
+%end
+
+%hook _TtC11IGDSAShared34IGStickyContentLaneSelectionHelper
+
 - (NSInteger)feedStickyContentLaneSelection {
     if (!SPKFollowingFeedEnabled())
         return %orig;
@@ -81,8 +103,10 @@ static BOOL SPKFollowingFeedEnabled(void) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    if (SPKFollowingFeedEnabled()) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    static BOOL sHasSwitchedToFollowing = NO;
+    if (SPKFollowingFeedEnabled() && !sHasSwitchedToFollowing) {
+        sHasSwitchedToFollowing = YES;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             if ([self respondsToSelector:@selector(navigateToFollowingFeedWithAnimated:)]) {
                 ((void (*)(id, SEL, BOOL))objc_msgSend)(self, @selector(navigateToFollowingFeedWithAnimated:), NO);
             }
@@ -108,23 +132,27 @@ extern "C" void SPKInstallFollowingFeedHooksIfEnabled(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         Class picker = SPKResolveIGClass(@"IGHomeFeedPicker.IGHomeFeedPickerMenuController", @"IGHomeFeedPickerMenuController");
+        Class helpers = SPKResolveIGClass(@"IGHomeFeedPicker.IGHomeFeedPickerHelpers", @"IGHomeFeedPickerHelpers");
         Class dsa = SPKResolveIGClass(@"IGDSAShared.IGDSAGatingManager", @"IGDSAGatingManager");
+        Class stickyHelper = SPKResolveIGClass(@"IGDSAShared.IGStickyContentLaneSelectionHelper", @"_TtC11IGDSAShared34IGStickyContentLaneSelectionHelper");
         Class tray = SPKResolveIGClass(@"IGStoryTrayUIModels.IGStoryTrayCellViewModel", @"IGStoryTrayCellViewModel");
         Class container = SPKResolveIGClass(@"IGHomeSundialFeedContentContainer.IGHomeSundialFeedContentContainerViewController",
                                            @"_TtC33IGHomeSundialFeedContentContainer47IGHomeSundialFeedContentContainerViewController");
 
-        SPKLog(@"FollowingFeed", @"installing hooks — picker=%@ dsa=%@ tray=%@ container=%@",
-               picker ? @"OK" : @"NIL", dsa ? @"OK" : @"NIL",
-               tray ? @"OK" : @"NIL", container ? @"OK" : @"NIL");
+        SPKLog(@"FollowingFeed", @"installing hooks — picker=%@ helpers=%@ dsa=%@ sticky=%@ tray=%@ container=%@",
+               picker ? @"OK" : @"NIL", helpers ? @"OK" : @"NIL", dsa ? @"OK" : @"NIL",
+               stickyHelper ? @"OK" : @"NIL", tray ? @"OK" : @"NIL", container ? @"OK" : @"NIL");
 
-        if (picker) {
+        if (picker || helpers) {
             %init(SPKFollowingPickerHooks,
-                  IGHomeFeedPickerMenuController = picker);
+                  IGHomeFeedPickerMenuController = picker,
+                  IGHomeFeedPickerHelpers = helpers);
         }
 
-        if (dsa) {
+        if (dsa || stickyHelper) {
             %init(SPKFollowingDSAHooks,
-                  IGDSAGatingManager = dsa);
+                  IGDSAGatingManager = dsa,
+                  _TtC11IGDSAShared34IGStickyContentLaneSelectionHelper = stickyHelper);
         }
 
         if (tray) {
