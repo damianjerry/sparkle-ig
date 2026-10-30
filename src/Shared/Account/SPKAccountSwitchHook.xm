@@ -18,7 +18,7 @@
 @interface IGProfileNavigationHeaderView : UIView
 @end
 
-@interface IGAccountSwitcher : NSObject
+@interface IGAccountSwitcher (SPKLock)
 - (long long)switchToUserWithPK:(id)pk destinationAppSurface:(id)surface destinationURL:(id)url entryPoint:(long long)point loggingData:(id)data;
 - (long long)switchToUser:(id)user destinationAppSurface:(id)surface destinationURL:(id)url entryPoint:(long long)point loggingData:(id)data;
 - (void)showLogoutAlertDialogWithUserSession:(id)session entryPoint:(NSInteger)point;
@@ -39,7 +39,7 @@
 @interface IGSSOAccountPickerViewController : UIViewController
 @end
 
-@interface IGURLHandler : NSObject
+@interface IGURLHandler (SPKLock)
 + (BOOL)canOpenURL:(NSURL *)url;
 + (BOOL)openInternalURL:(NSURL *)url presentationConfig:(id)a1 controller:(id)a2 animated:(BOOL)a3 sourceURL:(id)a4 sourceMedia:(id)a5 ctaPresenterContext:(id)a6 loggingProvider:(id)a7 userSession:(id)a8 deviceSession:(id)a9 analyticsModule:(id)a10 annotation:(id)a11 sponsoredSupportConfiguration:(id)a12 isFromExternalDeeplink:(BOOL)a13;
 + (BOOL)openInternalURL:(NSURL *)url presentationConfig:(id)a1 controller:(id)a2 animated:(BOOL)a3 sourceURL:(id)a4 sourceMedia:(id)a5 ctaPresenterContext:(id)a6 loggingProvider:(id)a7 userSession:(id)a8 deviceSession:(id)a9 analyticsModule:(id)a10 sourceApplication:(id)a11 annotation:(id)a12 sponsoredSupportConfiguration:(id)a13 isFromExternalDeeplink:(BOOL)a14;
