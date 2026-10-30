@@ -206,25 +206,6 @@
 
 %end
 
-// 8. Global safety guard: intercept any presentation of account switching/adding controllers
-%hook UIViewController
-
-- (void)presentViewController:(UIViewController *)viewControllerToPresent animated:(BOOL)flag completion:(void (^)(void))completion {
-    NSString *className = NSStringFromClass([viewControllerToPresent class]);
-    if ([className containsString:@"SwitchUser"] ||
-        [className containsString:@"AddAccount"] ||
-        [className containsString:@"AccountSwitcher"]) {
-        SPKLog(@"AccountLock", @"[Single Account Lock] Intercepted and blocked modal presentation of %@", className);
-        if (completion) {
-            completion();
-        }
-        return;
-    }
-    %orig;
-}
-
-%end
-
 %end // SPKSingleAccountLockHooks
 
 extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
@@ -245,7 +226,6 @@ extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
               IGAddAccountManager = addManagerCls,
               IGAddAccountSheetViewController = addSheetCls,
               IGSwitchUsersController = switchUsersCls,
-              IGSettingsCategoriesViewController = settingsCatCls,
-              UIViewController = [UIViewController class]);
+              IGSettingsCategoriesViewController = settingsCatCls);
     });
 }

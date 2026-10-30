@@ -44,9 +44,13 @@ static BOOL SPKFollowingFeedEnabled(void) {
 
 - (id)selectedMainFeedViewModel {
     if (SPKFollowingFeedEnabled()) {
-        id following = ((id (*)(id, SEL))objc_msgSend)(self, @selector(_followingMainFeedViewModel));
-        if (following)
-            return following;
+        @try {
+            if ([self respondsToSelector:@selector(_followingMainFeedViewModel)]) {
+                id following = ((id (*)(id, SEL))objc_msgSend)(self, @selector(_followingMainFeedViewModel));
+                if (following)
+                    return following;
+            }
+        } @catch (__unused NSException *e) {}
     }
     return %orig;
 }
@@ -163,10 +167,14 @@ static BOOL SPKFollowingFeedEnabled(void) {
 
 - (double)avatarSizeAdjustment {
     if (SPKFollowingFeedEnabled()) {
-        NSString *module = ((NSString * (*)(id, SEL)) objc_msgSend)(self, @selector(module));
-        if ([module isKindOfClass:[NSString class]] && [module hasPrefix:@"feed_timeline"]) {
-            return 28.5;
-        }
+        @try {
+            if ([self respondsToSelector:@selector(module)]) {
+                NSString *module = ((NSString * (*)(id, SEL)) objc_msgSend)(self, @selector(module));
+                if ([module isKindOfClass:[NSString class]] && [module hasPrefix:@"feed_timeline"]) {
+                    return 28.5;
+                }
+            }
+        } @catch (__unused NSException *e) {}
     }
     return %orig;
 }
