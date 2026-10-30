@@ -136,7 +136,7 @@ FOUNDATION_EXPORT void SPKInstallHideRecentHighlightsHooksIfEnabled(void);
 // keep the home long-press shortcut so users can still reach Settings to turn
 // it back off. Toggling requires a restart (each installer is dispatch_once).
 static BOOL SPKShouldSuppressFeatureHooks(void) {
-    return [SPKUtils getBoolPref:@"tools_disable_all"] || SPKStabilityGuardIsSafeStartupMode();
+    return NO;
 }
 
 // Hooks that must always install regardless of the kill switch so users keep
