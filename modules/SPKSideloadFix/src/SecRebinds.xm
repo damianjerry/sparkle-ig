@@ -92,11 +92,22 @@ static NSString *SPKSideloadAccessGroup(void) {
 		NSString *sentinelGroup = SPKAccessGroupFromSentinelKeychainItem(&sentinelStatus);
 		NSString *entitlementGroup = sentinelGroup.length == 0 ? SPKAccessGroupFromEntitlements() : nil;
 		NSString *resolvedGroup = sentinelGroup.length > 0 ? sentinelGroup : entitlementGroup;
+		if (resolvedGroup.length > 0 && [resolvedGroup containsString:@"*"]) {
+			NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier] ?: @"com.damianouatu.instagram";
+			resolvedGroup = [resolvedGroup stringByReplacingOccurrencesOfString:@"*" withString:bundleId];
+		}
+		if (resolvedGroup.length == 0) {
+			LSBundleProxy *bundleProxy = [objc_getClass("LSBundleProxy") bundleProxyForCurrentProcess];
+			NSString *teamId = bundleProxy.entitlements[@"com.apple.developer.team-identifier"] ?: @"Y7644YQTNB";
+			NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier] ?: @"com.damianouatu.instagram";
+			resolvedGroup = [NSString stringWithFormat:@"%@.%@", teamId, bundleId];
+		}
 		if (resolvedGroup.length > 0) {
 			accessGroup = [resolvedGroup copy];
-			SPKSideloadLog(@"Resolved usable keychain access group source=%@ sentinelStatus=%d",
+			SPKSideloadLog(@"Resolved usable keychain access group source=%@ sentinelStatus=%d group=%@",
 				sentinelGroup.length > 0 ? @"sentinel" : @"runtime-entitlements",
-				(int)sentinelStatus);
+				(int)sentinelStatus,
+				accessGroup);
 			return accessGroup;
 		}
 
