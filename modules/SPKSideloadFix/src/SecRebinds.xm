@@ -249,7 +249,7 @@ static OSStatus zxSecItemUpdate(CFDictionaryRef query, CFDictionaryRef attribute
 	CFAbsoluteTime startedAt = CFAbsoluteTimeGetCurrent();
 	SPKAccessGroupPatchInfo queryInfo = {0};
 	SPKAccessGroupPatchInfo updateInfo = {0};
-	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, YES, &queryInfo);
+	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, NO, &queryInfo);
 	CFDictionaryRef patchedAttributes = SPKCopyDictionaryByReplacingAccessGroup(attributesToUpdate, NO, &updateInfo);
 	OSStatus status = origSecItemUpdate(patchedQuery ?: query, patchedAttributes ?: attributesToUpdate);
 	if (status != errSecSuccess && (patchedQuery || patchedAttributes)) {

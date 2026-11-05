@@ -6,16 +6,23 @@ static NSURL *redirectedAppGroupURL(NSString *groupIdentifier) {
 	if (!groupIdentifier || ![groupIdentifier isKindOfClass:[NSString class]]) return nil;
 	if (![groupIdentifier hasPrefix:@"group"]) return nil;
 
+	NSURL *containerURL = nil;
 	if (NSURL *appGroupURL = getAppGroupPathIfExists()) {
-		return [appGroupURL URLByAppendingPathComponent:groupIdentifier];
+		containerURL = [appGroupURL URLByAppendingPathComponent:groupIdentifier];
+	} else {
+		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+		NSString *documentsPath = [paths lastObject];
+		if (!documentsPath) return nil;
+		NSString *fakePath = [documentsPath stringByAppendingPathComponent:groupIdentifier];
+		containerURL = [NSURL fileURLWithPath:fakePath];
 	}
 
-	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-	NSString *documentsPath = [paths lastObject];
-	if (!documentsPath) return nil;
-
-	NSString *fakePath = [documentsPath stringByAppendingPathComponent:groupIdentifier];
-	return [NSURL fileURLWithPath:fakePath];
+	if (containerURL) {
+		createDirectoryIfNotExists(containerURL.path);
+		NSURL *prefsURL = [[containerURL URLByAppendingPathComponent:@"Library"] URLByAppendingPathComponent:@"Preferences"];
+		createDirectoryIfNotExists(prefsURL.path);
+	}
+	return containerURL;
 }
 
 static NSURL *(*orig_IGAppGroupContainerURL)(void) = NULL;
@@ -83,24 +90,29 @@ BOOL isAppExtensionProcess(void) {
 }
 
 %hook NSUserDefaults
+
+- (id)initWithSuiteName:(NSString *)suiteName {
+	if ([suiteName hasPrefix:@"group"]) {
+		if (NSURL *customContainerURL = redirectedAppGroupURL(suiteName)) {
+			SPKSideloadLog(@"Redirecting NSUserDefaults initWithSuiteName=%@ to container=%@", suiteName, customContainerURL.path);
+			return [self _initWithSuiteName:suiteName container:customContainerURL];
+		}
+	}
+	return %orig(suiteName);
+}
+
 - (id)_initWithSuiteName:(NSString *)suiteName container:(NSURL *)container {
-	if (!isAppExtensionProcess()) {
-		return %orig(suiteName, container);
+	if ([suiteName hasPrefix:@"group"]) {
+		if (!container || !getAppGroupPathIfExists()) {
+			if (NSURL *customContainerURL = redirectedAppGroupURL(suiteName)) {
+				SPKSideloadLog(@"Redirecting NSUserDefaults _initWithSuiteName=%@ to container=%@", suiteName, customContainerURL.path);
+				return %orig(suiteName, customContainerURL);
+			}
+		}
 	}
-
-	if (![suiteName hasPrefix:@"group"]) {
-		return %orig(suiteName, container);
-	}
-
-	if (NSURL *customContainerURL = redirectedAppGroupURL(suiteName)) {
-		createDirectoryIfNotExists(customContainerURL.path);
-		SPKSideloadLog(@"Redirecting extension defaults suite=%@ to app group container", suiteName);
-		return %orig(suiteName, customContainerURL);
-	}
-
-	SPKSideloadLog(@"Unable to construct app group container for suite=%@; using original container", suiteName);
 	return %orig(suiteName, container);
 }
+
 %end
 
 %ctor {

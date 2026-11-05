@@ -95,6 +95,12 @@
 - (void)multiTapLoginContainerViewDidTapSignUpButton:(id)sender;
 @end
 
+@interface _TtC14CaaNativeLogin24SingleAYMHViewController : UIViewController
+@end
+
+@interface _TtC14CaaNativeLogin23MultiAYMHViewController : UIViewController
+@end
+
 // MARK: - Blocked Text Helpers
 
 static BOOL SPKIsBlockedAccountText(NSString *raw) {
@@ -1036,11 +1042,25 @@ static void SPKTriggerSingleAccountLogin(id viewOrVC) {
             if ([ctrl isKindOfClass:[UIButton class]]) {
                 title = [((UIButton *)ctrl) titleForState:UIControlStateNormal] ?: @"";
             }
+            if (!title.length && [ctrl respondsToSelector:@selector(accessibilityLabel)]) {
+                title = ctrl.accessibilityLabel ?: @"";
+            }
+            if (!title.length) {
+                for (UIView *s in ctrl.subviews) {
+                    if ([s isKindOfClass:[UILabel class]]) {
+                        title = ((UILabel *)s).text ?: @"";
+                        if (title.length) break;
+                    }
+                }
+            }
             NSString *low = title.lowercaseString;
-            // Ignore cancel / switch / remove / alt
-            if (![low containsString:@"switch"] && ![low containsString:@"comut"] &&
+            if (([low containsString:@"conect"] || [low containsString:@"log in"] ||
+                 [low containsString:@"login"] || [low containsString:@"continu"] ||
+                 [low containsString:@"petredima"]) &&
+                ![low containsString:@"switch"] && ![low containsString:@"comut"] &&
                 ![low containsString:@"cancel"] && ![low containsString:@"renunț"] &&
-                ![low containsString:@"remove"] && ![low containsString:@"șterge"]) {
+                ![low containsString:@"remove"] && ![low containsString:@"șterge"] &&
+                ![low containsString:@"alt"] && ![low containsString:@"another"]) {
                 SPKLog(@"AccountLock", @"Sending TouchUpInside to login control: %@", title);
                 [ctrl sendActionsForControlEvents:UIControlEventTouchUpInside];
                 return;
@@ -1049,6 +1069,69 @@ static void SPKTriggerSingleAccountLogin(id viewOrVC) {
 
         [queue addObjectsFromArray:curr.subviews];
     }
+}
+
+static void SPKTriggerSingleAYMHAutoLogin(UIViewController *vc) {
+    if (!vc) return;
+    static CFAbsoluteTime s_lastAYMH = 0;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (now - s_lastAYMH < 0.5) return;
+    s_lastAYMH = now;
+
+    SPKLog(@"AccountLock", @"Triggering auto-login from SingleAYMHViewController...");
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIView *root = vc.view;
+        if (!root) return;
+
+        NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:root];
+        while (queue.count > 0) {
+            UIView *curr = queue.firstObject;
+            [queue removeObjectAtIndex:0];
+
+            if ([curr isKindOfClass:[UIControl class]]) {
+                UIControl *ctrl = (UIControl *)curr;
+                NSString *title = @"";
+                if ([ctrl isKindOfClass:[UIButton class]]) {
+                    title = [((UIButton *)ctrl) titleForState:UIControlStateNormal] ?: @"";
+                }
+                if (!title.length && [ctrl respondsToSelector:@selector(accessibilityLabel)]) {
+                    title = ctrl.accessibilityLabel ?: @"";
+                }
+                if (!title.length) {
+                    for (UIView *s in ctrl.subviews) {
+                        if ([s isKindOfClass:[UILabel class]]) {
+                            title = ((UILabel *)s).text ?: @"";
+                            if (title.length) break;
+                        }
+                    }
+                }
+
+                NSString *low = title.lowercaseString;
+                if (([low containsString:@"conect"] || [low containsString:@"log in"] ||
+                     [low containsString:@"login"] || [low containsString:@"continu"] ||
+                     [low containsString:@"petredima"]) &&
+                    ![low containsString:@"alt"] && ![low containsString:@"another"] &&
+                    ![low containsString:@"creeaz"] && ![low containsString:@"create"] &&
+                    ![low containsString:@"switch"] && ![low containsString:@"cancel"]) {
+                    SPKLog(@"AccountLock", @"Found AYMH login button: '%@', executing tap", title);
+                    [ctrl sendActionsForControlEvents:UIControlEventTouchUpInside];
+                    for (id target in [ctrl allTargets]) {
+                        NSArray *actions = [ctrl actionsForTarget:target forControlEvent:UIControlEventTouchUpInside];
+                        for (NSString *actionStr in actions) {
+                            SEL action = NSSelectorFromString(actionStr);
+                            if ([target respondsToSelector:action]) {
+                                [target performSelector:action withObject:ctrl];
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+
+            [queue addObjectsFromArray:curr.subviews];
+        }
+    });
 }
 
 %group SPKOneTapAutoLoginHooks
@@ -1120,6 +1203,41 @@ static void SPKTriggerSingleAccountLogin(id viewOrVC) {
 - (void)multiTapLoginContainerViewDidTapSignUpButton:(id)sender {
     SPKLog(@"AccountLock", @"Blocked multiTapLoginContainerViewDidTapSignUpButton");
     return;
+}
+
+%end
+
+%hook _TtC14CaaNativeLogin24SingleAYMHViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    SPKTriggerSingleAYMHAutoLogin((UIViewController *)self);
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SPKTriggerSingleAYMHAutoLogin((UIViewController *)self);
+    });
+}
+
+- (void)viewDidLayoutSubviews {
+    %orig;
+    SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
+}
+
+%end
+
+%hook _TtC14CaaNativeLogin23MultiAYMHViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
+}
+
+- (void)viewDidLayoutSubviews {
+    %orig;
+    SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
 }
 
 %end
@@ -1202,12 +1320,16 @@ extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
         Class singleOneTapCls = SPKResolveIGClass(@"IGOneTapLoginUI.IGSingleOneTapLoginViewController", @"_TtC15IGOneTapLoginUI33IGSingleOneTapLoginViewController");
         Class singleAccountViewCls = SPKResolveIGClass(@"IGOneTapLoginUI.IGOneTapSingleAccountLoginView", @"_TtC15IGOneTapLoginUI30IGOneTapSingleAccountLoginView");
         Class multiTapCls = SPKResolveIGClass(@"IGOneTapLoginUI.IGMultiTapLoginViewController", @"_TtC15IGOneTapLoginUI29IGMultiTapLoginViewController");
+        Class singleAYMHCls = SPKResolveIGClass(@"CaaNativeLogin.SingleAYMHViewController", @"_TtC14CaaNativeLogin24SingleAYMHViewController");
+        Class multiAYMHCls = SPKResolveIGClass(@"CaaNativeLogin.MultiAYMHViewController", @"_TtC14CaaNativeLogin23MultiAYMHViewController");
 
-        if (singleOneTapCls || singleAccountViewCls || multiTapCls) {
+        if (singleOneTapCls || singleAccountViewCls || multiTapCls || singleAYMHCls || multiAYMHCls) {
             %init(SPKOneTapAutoLoginHooks,
                   _TtC15IGOneTapLoginUI33IGSingleOneTapLoginViewController = singleOneTapCls,
                   _TtC15IGOneTapLoginUI30IGOneTapSingleAccountLoginView = singleAccountViewCls,
-                  _TtC15IGOneTapLoginUI29IGMultiTapLoginViewController = multiTapCls);
+                  _TtC15IGOneTapLoginUI29IGMultiTapLoginViewController = multiTapCls,
+                  _TtC14CaaNativeLogin24SingleAYMHViewController = singleAYMHCls,
+                  _TtC14CaaNativeLogin23MultiAYMHViewController = multiAYMHCls);
         }
 
         %init(SPKGeneralLockUIHooks);
