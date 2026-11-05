@@ -40,22 +40,64 @@
 + (BOOL)openInternalURL:(NSURL *)url presentationConfig:(id)a1 controller:(id)a2 animated:(BOOL)a3 sourceURL:(id)a4 sourceMedia:(id)a5 ctaPresenterContext:(id)a6 loggingProvider:(id)a7 userSession:(id)a8 deviceSession:(id)a9 analyticsModule:(id)a10 sourceApplication:(id)a11 annotation:(id)a12 sponsoredSupportConfiguration:(id)a13 isFromExternalDeeplink:(BOOL)a14;
 @end
 
+@interface _TtC15IGOneTapLoginUI33IGSingleOneTapLoginViewController : UIViewController
+- (void)singleOneTapLoginViewDidTapLoginButton:(id)sender;
+- (void)singleOneTapLoginViewDidTapSwitchAccountsButton:(id)sender;
+- (void)singleOneTapLoginViewDidTapSignUpButton:(id)sender;
+@end
+
+@interface _TtC15IGOneTapLoginUI30IGOneTapSingleAccountLoginView : UIView
+- (void)didTapSecondaryButton;
+@end
+
+@interface _TtC15IGOneTapLoginUI29IGMultiTapLoginViewController : UIViewController
+- (void)multiTapLoginContainerViewDidTapSwitchAccountsButton:(id)sender;
+- (void)multiTapLoginContainerViewDidTapSignUpButton:(id)sender;
+@end
+
 // MARK: - Blocked Text Helpers
 
 static BOOL SPKIsBlockedAccountText(NSString *raw) {
     if (!raw || ![raw isKindOfClass:[NSString class]]) return NO;
     NSString *t = raw.lowercaseString;
+    // Logout actions
     if ([t containsString:@"deconect"] || // Deconectare, Deconectează-te, Deconectați-vă
         [t containsString:@"log out"] ||
         [t containsString:@"logout"] ||
-        [t containsString:@"sign out"] ||
-        [t containsString:@"adaug"] || // Adaugă un cont, Adăugare cont
+        [t containsString:@"sign out"]) {
+        return YES;
+    }
+    // Add account actions
+    if ([t containsString:@"adaugă un cont"] ||
+        [t containsString:@"adauga un cont"] ||
+        [t containsString:@"adaugă cont"] ||
+        [t containsString:@"adauga cont"] ||
+        [t containsString:@"adăugare cont"] ||
+        [t containsString:@"adaugare cont"] ||
+        [t containsString:@"adăugați un cont"] ||
+        [t containsString:@"adaugati un cont"] ||
         [t containsString:@"add account"] ||
         [t containsString:@"add an account"] ||
-        [t containsString:@"comut"] || // Comută pe alt cont, Comutare conturi
+        [t containsString:@"add existing account"] ||
+        [t containsString:@"create new account"] ||
+        [t containsString:@"creează un cont nou"] ||
+        [t containsString:@"creeaza un cont nou"]) {
+        return YES;
+    }
+    // Switch account actions
+    if ([t containsString:@"comută pe alt cont"] ||
+        [t containsString:@"comuta pe alt cont"] ||
+        [t containsString:@"comută contul"] ||
+        [t containsString:@"comuta contul"] ||
+        [t containsString:@"comutare conturi"] ||
+        [t containsString:@"comutare cont"] ||
         [t containsString:@"switch account"] ||
         [t containsString:@"switch user"] ||
-        [t containsString:@"centru de conturi"] ||
+        [t containsString:@"switch profile"]) {
+        return YES;
+    }
+    // Accounts Center actions
+    if ([t containsString:@"centru de conturi"] ||
         [t containsString:@"centrul de conturi"] ||
         [t containsString:@"administrare conturi"] ||
         [t containsString:@"account center"] ||
@@ -326,17 +368,6 @@ static void SPKPurgeBlockedElementsInView(UIView *view) {
 
 %end
 
-%hook IGAccountTrayCollectionViewCell
-
-- (void)layoutSubviews {
-    %orig;
-    UIView *selfView = (UIView *)self;
-    selfView.hidden = YES;
-    selfView.userInteractionEnabled = NO;
-}
-
-%end
-
 %end // SPKProfileTitleLockHooks
 
 // MARK: - Core Switcher & Dialog Hooks
@@ -523,7 +554,24 @@ sponsoredSupportConfiguration:(id)a13
 
 %end // SPKCoreAccountLockHooks
 
-// MARK: - General UIKit Hooks (Always Active)
+// MARK: - General UIKit Hooks (Settings and UI Lockdown)
+
+static UIViewController *SPKFindViewController(UIResponder *responder) {
+    while (responder && ![responder isKindOfClass:[UIViewController class]]) {
+        responder = responder.nextResponder;
+    }
+    return (UIViewController *)responder;
+}
+
+static BOOL SPKIsSettingsViewController(UIViewController *vc) {
+    if (!vc) return NO;
+    NSString *clsName = NSStringFromClass([vc class]);
+    return [clsName containsString:@"Settings"] ||
+           [clsName containsString:@"Settings2"] ||
+           [clsName containsString:@"Menu"] ||
+           [clsName containsString:@"ActionSheet"] ||
+           [clsName containsString:@"HostingController"];
+}
 
 %group SPKGeneralLockUIHooks
 
@@ -548,25 +596,12 @@ sponsoredSupportConfiguration:(id)a13
 
 %end
 
-%hook UICollectionViewCell
-
-- (void)layoutSubviews {
-    %orig;
-    if (SPKViewContainsBlockedText((UIView *)self)) {
-        UICollectionViewCell *cell = (UICollectionViewCell *)self;
-        cell.hidden = YES;
-        cell.alpha = 0.0;
-        cell.userInteractionEnabled = NO;
-        cell.contentView.hidden = YES;
-    }
-}
-
-%end
-
 %hook UITableViewCell
 
 - (void)layoutSubviews {
     %orig;
+    UIViewController *vc = SPKFindViewController(self);
+    if (!SPKIsSettingsViewController(vc)) return;
     if (SPKViewContainsBlockedText((UIView *)self)) {
         UITableViewCell *cell = (UITableViewCell *)self;
         cell.hidden = YES;
@@ -578,29 +613,14 @@ sponsoredSupportConfiguration:(id)a13
 
 %end
 
-%hook UICollectionView
-
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    UITouch *touch = [touches anyObject];
-    if (touch) {
-        CGPoint point = [touch locationInView:self];
-        NSIndexPath *indexPath = [self indexPathForItemAtPoint:point];
-        if (indexPath) {
-            UICollectionViewCell *cell = [self cellForItemAtIndexPath:indexPath];
-            if (cell && SPKViewContainsBlockedText(cell)) {
-                SPKLog(@"AccountLock", @"Blocked touch on UICollectionView cell containing blocked text");
-                return;
-            }
-        }
-    }
-    %orig;
-}
-
-%end
-
 %hook UITableView
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    UIViewController *vc = SPKFindViewController(self);
+    if (!SPKIsSettingsViewController(vc)) {
+        %orig;
+        return;
+    }
     UITouch *touch = [touches anyObject];
     if (touch) {
         CGPoint point = [touch locationInView:self];
@@ -619,6 +639,68 @@ sponsoredSupportConfiguration:(id)a13
 %end
 
 %end // SPKGeneralLockUIHooks
+
+// MARK: - Auto-Login & Switch Block Hooks for One Tap Login
+
+%group SPKOneTapAutoLoginHooks
+
+%hook _TtC15IGOneTapLoginUI33IGSingleOneTapLoginViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    static CFAbsoluteTime s_lastAutoLogin = 0;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (now - s_lastAutoLogin > 2.0) {
+        s_lastAutoLogin = now;
+        SPKLog(@"AccountLock", @"Auto-triggering singleOneTapLoginViewDidTapLoginButton");
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            @try {
+                if ([self respondsToSelector:@selector(singleOneTapLoginViewDidTapLoginButton:)]) {
+                    [self performSelector:@selector(singleOneTapLoginViewDidTapLoginButton:) withObject:nil];
+                }
+            } @catch (NSException *e) {
+                SPKLog(@"AccountLock", @"Auto-login exception: %@", e);
+            }
+        });
+    }
+}
+
+- (void)singleOneTapLoginViewDidTapSwitchAccountsButton:(id)sender {
+    SPKLog(@"AccountLock", @"Blocked singleOneTapLoginViewDidTapSwitchAccountsButton");
+    return;
+}
+
+- (void)singleOneTapLoginViewDidTapSignUpButton:(id)sender {
+    SPKLog(@"AccountLock", @"Blocked singleOneTapLoginViewDidTapSignUpButton");
+    return;
+}
+
+%end
+
+%hook _TtC15IGOneTapLoginUI30IGOneTapSingleAccountLoginView
+
+- (void)didTapSecondaryButton {
+    SPKLog(@"AccountLock", @"Blocked didTapSecondaryButton on IGOneTapSingleAccountLoginView");
+    return;
+}
+
+%end
+
+%hook _TtC15IGOneTapLoginUI29IGMultiTapLoginViewController
+
+- (void)multiTapLoginContainerViewDidTapSwitchAccountsButton:(id)sender {
+    SPKLog(@"AccountLock", @"Blocked multiTapLoginContainerViewDidTapSwitchAccountsButton");
+    return;
+}
+
+- (void)multiTapLoginContainerViewDidTapSignUpButton:(id)sender {
+    SPKLog(@"AccountLock", @"Blocked multiTapLoginContainerViewDidTapSignUpButton");
+    return;
+}
+
+%end
+
+%end // SPKOneTapAutoLoginHooks
 
 extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
     static dispatch_once_t onceToken;
@@ -643,16 +725,14 @@ extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
         Class titleButtonCls = SPKResolveIGClass(@"IGProfileTitleButton", @"IGProfileTitleButton");
         Class singleUserTitleCls = SPKResolveIGClass(@"IGProfileTitleViewKitSwift.IGProfileSingleUserTitleView", @"_TtC26IGProfileTitleViewKitSwift28IGProfileSingleUserTitleView");
         Class ghostBadgeCls = SPKResolveIGClass(@"IGProfileTitleViewKit.IGGhostBadgeTitleButtonWrapper", @"_TtC21IGProfileTitleViewKit30IGGhostBadgeTitleButtonWrapper");
-        Class trayCellCls = SPKResolveIGClass(@"IGAccountTrayCollectionViewCell", @"IGAccountTrayCollectionViewCell");
 
-        if (swiftTitleVCCls || profileTitleCls || titleButtonCls || singleUserTitleCls || ghostBadgeCls || trayCellCls) {
+        if (swiftTitleVCCls || profileTitleCls || titleButtonCls || singleUserTitleCls || ghostBadgeCls) {
             %init(SPKProfileTitleLockHooks,
                   _TtC21IGProfileTitleViewKit28IGProfileTitleViewController = swiftTitleVCCls,
                   IGProfileTitleViewController = profileTitleCls,
                   IGProfileTitleButton = titleButtonCls,
                   _TtC26IGProfileTitleViewKitSwift28IGProfileSingleUserTitleView = singleUserTitleCls,
-                  _TtC21IGProfileTitleViewKit30IGGhostBadgeTitleButtonWrapper = ghostBadgeCls,
-                  IGAccountTrayCollectionViewCell = trayCellCls);
+                  _TtC21IGProfileTitleViewKit30IGGhostBadgeTitleButtonWrapper = ghostBadgeCls);
         }
 
         Class accountSwitcherCls = SPKResolveIGClass(@"IGAccountSwitcher", @"IGAccountSwitcher");
@@ -670,6 +750,17 @@ extern "C" void SPKInstallAccountSwitchHooksIfNeeded(void) {
                   IGSwitchUsersViewController = switchUsersCls,
                   IGSSOAccountPickerViewController = ssoCls,
                   IGURLHandler = urlHandlerCls);
+        }
+
+        Class singleOneTapCls = SPKResolveIGClass(@"IGOneTapLoginUI.IGSingleOneTapLoginViewController", @"_TtC15IGOneTapLoginUI33IGSingleOneTapLoginViewController");
+        Class singleAccountViewCls = SPKResolveIGClass(@"IGOneTapLoginUI.IGOneTapSingleAccountLoginView", @"_TtC15IGOneTapLoginUI30IGOneTapSingleAccountLoginView");
+        Class multiTapCls = SPKResolveIGClass(@"IGOneTapLoginUI.IGMultiTapLoginViewController", @"_TtC15IGOneTapLoginUI29IGMultiTapLoginViewController");
+
+        if (singleOneTapCls || singleAccountViewCls || multiTapCls) {
+            %init(SPKOneTapAutoLoginHooks,
+                  _TtC15IGOneTapLoginUI33IGSingleOneTapLoginViewController = singleOneTapCls,
+                  _TtC15IGOneTapLoginUI30IGOneTapSingleAccountLoginView = singleAccountViewCls,
+                  _TtC15IGOneTapLoginUI29IGMultiTapLoginViewController = multiTapCls);
         }
 
         %init(SPKGeneralLockUIHooks);

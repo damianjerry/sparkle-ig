@@ -224,6 +224,9 @@ static OSStatus zxSecItemAdd(CFDictionaryRef attributes, CFTypeRef *result) {
 	SPKAccessGroupPatchInfo patchInfo = {0};
 	CFDictionaryRef patchedAttributes = SPKCopyDictionaryByReplacingAccessGroup(attributes, YES, &patchInfo);
 	OSStatus status = origSecItemAdd(patchedAttributes ?: attributes, result);
+	if (status != errSecSuccess && patchedAttributes) {
+		status = origSecItemAdd(attributes, result);
+	}
 	if (patchedAttributes) CFRelease(patchedAttributes);
 	SPKLogSecOperation(@"SecItemAdd", status, startedAt, patchInfo, NULL);
 	return status;
@@ -234,6 +237,9 @@ static OSStatus zxSecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result) 
 	SPKAccessGroupPatchInfo patchInfo = {0};
 	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, YES, &patchInfo);
 	OSStatus status = origSecItemCopyMatching(patchedQuery ?: query, result);
+	if (status != errSecSuccess && patchedQuery) {
+		status = origSecItemCopyMatching(query, result);
+	}
 	if (patchedQuery) CFRelease(patchedQuery);
 	SPKLogSecOperation(@"SecItemCopyMatching", status, startedAt, patchInfo, NULL);
 	return status;
@@ -246,6 +252,9 @@ static OSStatus zxSecItemUpdate(CFDictionaryRef query, CFDictionaryRef attribute
 	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, YES, &queryInfo);
 	CFDictionaryRef patchedAttributes = SPKCopyDictionaryByReplacingAccessGroup(attributesToUpdate, NO, &updateInfo);
 	OSStatus status = origSecItemUpdate(patchedQuery ?: query, patchedAttributes ?: attributesToUpdate);
+	if (status != errSecSuccess && (patchedQuery || patchedAttributes)) {
+		status = origSecItemUpdate(query, attributesToUpdate);
+	}
 	if (patchedQuery) CFRelease(patchedQuery);
 	if (patchedAttributes) CFRelease(patchedAttributes);
 	SPKLogSecOperation(@"SecItemUpdate", status, startedAt, queryInfo, &updateInfo);
@@ -257,6 +266,9 @@ static OSStatus zxSecItemDelete(CFDictionaryRef query) {
 	SPKAccessGroupPatchInfo patchInfo = {0};
 	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, YES, &patchInfo);
 	OSStatus status = origSecItemDelete(patchedQuery ?: query);
+	if (status != errSecSuccess && patchedQuery) {
+		status = origSecItemDelete(query);
+	}
 	if (patchedQuery) CFRelease(patchedQuery);
 	SPKLogSecOperation(@"SecItemDelete", status, startedAt, patchInfo, NULL);
 	return status;
