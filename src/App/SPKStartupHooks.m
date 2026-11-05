@@ -192,6 +192,7 @@ void SPKInstallLaunchCriticalHooks(void) {
     SPK_INSTALL(SPKInstallEditsShareFallbackHooksIfNeeded);
     SPK_INSTALL(SPKInstallNavigationHooksIfNeeded);
     SPK_INSTALL(SPKInstallSettingsShortcutsHooksIfNeeded);
+    SPK_INSTALL(SPKInstallAccountSwitchHooksIfNeeded);
 }
 
 void SPKInstallFeedSurfaceHooksIfNeeded(void) {

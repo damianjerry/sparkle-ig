@@ -235,7 +235,7 @@ static OSStatus zxSecItemAdd(CFDictionaryRef attributes, CFTypeRef *result) {
 static OSStatus zxSecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result) {
 	CFAbsoluteTime startedAt = CFAbsoluteTimeGetCurrent();
 	SPKAccessGroupPatchInfo patchInfo = {0};
-	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, YES, &patchInfo);
+	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, NO, &patchInfo);
 	OSStatus status = origSecItemCopyMatching(patchedQuery ?: query, result);
 	if (status != errSecSuccess && patchedQuery) {
 		status = origSecItemCopyMatching(query, result);
@@ -264,7 +264,7 @@ static OSStatus zxSecItemUpdate(CFDictionaryRef query, CFDictionaryRef attribute
 static OSStatus zxSecItemDelete(CFDictionaryRef query) {
 	CFAbsoluteTime startedAt = CFAbsoluteTimeGetCurrent();
 	SPKAccessGroupPatchInfo patchInfo = {0};
-	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, YES, &patchInfo);
+	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, NO, &patchInfo);
 	OSStatus status = origSecItemDelete(patchedQuery ?: query);
 	if (status != errSecSuccess && patchedQuery) {
 		status = origSecItemDelete(query);

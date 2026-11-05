@@ -8,6 +8,8 @@
 #import "SPKStartupHooks.h"
 #import "SPKStartupProfiler.h"
 
+FOUNDATION_EXPORT void SPKInstallAccountSwitchHooksIfNeeded(void);
+
 static NSDictionary *SPKBootstrapDefaults(void) {
     return @{
         @"tools_disable_safe_mode" : @(NO),
@@ -329,6 +331,7 @@ NSDictionary<NSString *, id> *SPKCoreRegisteredDefaults(void) {
 
 void SPKCoreInstallLaunchCriticalHooks(void) {
     SPKCoreRegisterBootstrapDefaults();
+    SPKInstallAccountSwitchHooksIfNeeded();
     SPKInstallLaunchCriticalHooks();
 }
 
