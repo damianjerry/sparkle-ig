@@ -2,6 +2,10 @@
 #import <dlfcn.h>
 #import "fishhook.h"
 
+@interface NSUserDefaults (SPKSideloadFixPrivate)
+- (instancetype)_initWithSuiteName:(NSString *)suiteName container:(NSURL *)container;
+@end
+
 static NSURL *redirectedAppGroupURL(NSString *groupIdentifier) {
 	if (!groupIdentifier || ![groupIdentifier isKindOfClass:[NSString class]]) return nil;
 	if (![groupIdentifier hasPrefix:@"group"]) return nil;
