@@ -96,9 +96,16 @@
 @end
 
 @interface _TtC14CaaNativeLogin24SingleAYMHViewController : UIViewController
+- (void)tappedLoginButton;
+- (void)tappedLogInToAnotherAccountButton;
+- (void)tappedCreateAccountButton;
+- (void)tappedSettings;
 @end
 
 @interface _TtC14CaaNativeLogin23MultiAYMHViewController : UIViewController
+- (void)tappedLogInToAnotherAccountButton;
+- (void)tappedCreateAccountButton;
+- (void)tappedSettings;
 @end
 
 // MARK: - Blocked Text Helpers
@@ -1080,6 +1087,12 @@ static void SPKTriggerSingleAYMHAutoLogin(UIViewController *vc) {
 
     SPKLog(@"AccountLock", @"Triggering auto-login from SingleAYMHViewController...");
 
+    if ([vc respondsToSelector:@selector(tappedLoginButton)]) {
+        SPKLog(@"AccountLock", @"Directly calling tappedLoginButton on SingleAYMHViewController");
+        [((_TtC14CaaNativeLogin24SingleAYMHViewController *)vc) tappedLoginButton];
+        return;
+    }
+
     dispatch_async(dispatch_get_main_queue(), ^{
         UIView *root = vc.view;
         if (!root) return;
@@ -1121,7 +1134,10 @@ static void SPKTriggerSingleAYMHAutoLogin(UIViewController *vc) {
                         for (NSString *actionStr in actions) {
                             SEL action = NSSelectorFromString(actionStr);
                             if ([target respondsToSelector:action]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
                                 [target performSelector:action withObject:ctrl];
+#pragma clang diagnostic pop
                             }
                         }
                     }
@@ -1226,6 +1242,21 @@ static void SPKTriggerSingleAYMHAutoLogin(UIViewController *vc) {
     SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
 }
 
+- (void)tappedLogInToAnotherAccountButton {
+    SPKLog(@"AccountLock", @"Blocked SingleAYMHViewController tappedLogInToAnotherAccountButton");
+    return;
+}
+
+- (void)tappedCreateAccountButton {
+    SPKLog(@"AccountLock", @"Blocked SingleAYMHViewController tappedCreateAccountButton");
+    return;
+}
+
+- (void)tappedSettings {
+    SPKLog(@"AccountLock", @"Blocked SingleAYMHViewController tappedSettings");
+    return;
+}
+
 %end
 
 %hook _TtC14CaaNativeLogin23MultiAYMHViewController
@@ -1238,6 +1269,21 @@ static void SPKTriggerSingleAYMHAutoLogin(UIViewController *vc) {
 - (void)viewDidLayoutSubviews {
     %orig;
     SPKPurgeBlockedElementsInView(((UIViewController *)self).view);
+}
+
+- (void)tappedLogInToAnotherAccountButton {
+    SPKLog(@"AccountLock", @"Blocked MultiAYMHViewController tappedLogInToAnotherAccountButton");
+    return;
+}
+
+- (void)tappedCreateAccountButton {
+    SPKLog(@"AccountLock", @"Blocked MultiAYMHViewController tappedCreateAccountButton");
+    return;
+}
+
+- (void)tappedSettings {
+    SPKLog(@"AccountLock", @"Blocked MultiAYMHViewController tappedSettings");
+    return;
 }
 
 %end
