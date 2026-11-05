@@ -12,6 +12,7 @@ static inline void SPKSideloadLog(NSString *format, ...) {
 	}
 
 	NSString *line = [NSString stringWithFormat:@"[Sparkle SideloadFix]: %@", body ?: @""];
+	NSLog(@"%@", line);
 	os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_DEFAULT, "%{public}s", line.UTF8String);
 }
 

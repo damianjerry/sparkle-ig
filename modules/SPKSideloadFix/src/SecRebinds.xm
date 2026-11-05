@@ -4,273 +4,73 @@
 #import "Header.h"
 #import "../fishhook/fishhook.h"
 
-static OSStatus (*origSecItemAdd)(CFDictionaryRef attributes, CFTypeRef *result);
-static OSStatus (*origSecItemCopyMatching)(CFDictionaryRef query, CFTypeRef *result);
-static OSStatus (*origSecItemUpdate)(CFDictionaryRef query, CFDictionaryRef attributesToUpdate);
-static OSStatus (*origSecItemDelete)(CFDictionaryRef query);
+static OSStatus (*origSecItemAdd)(CFDictionaryRef attributes, CFTypeRef *result) = NULL;
+static OSStatus (*origSecItemCopyMatching)(CFDictionaryRef query, CFTypeRef *result) = NULL;
+static OSStatus (*origSecItemUpdate)(CFDictionaryRef query, CFDictionaryRef attributesToUpdate) = NULL;
+static OSStatus (*origSecItemDelete)(CFDictionaryRef query) = NULL;
 
-static NSString *SPKStringFromEntitlementValue(id value) {
-	if ([value isKindOfClass:[NSString class]] && [value length] > 0) {
-		return value;
-	}
-	if ([value isKindOfClass:[NSArray class]]) {
-		for (id entry in (NSArray *)value) {
-			if ([entry isKindOfClass:[NSString class]] && [entry length] > 0) {
-				return entry;
-			}
-		}
-	}
-	return nil;
-}
+static CFDictionaryRef SPKSanitizedKeychainDictionary(CFDictionaryRef dict) {
+	if (!dict) return NULL;
+	NSDictionary *source = (__bridge NSDictionary *)dict;
+	if (![source isKindOfClass:[NSDictionary class]]) return NULL;
 
-static NSString *SPKAccessGroupFromEntitlements(void) {
-	LSBundleProxy *bundleProxy = [objc_getClass("LSBundleProxy") bundleProxyForCurrentProcess];
-	NSDictionary *entitlements = bundleProxy.entitlements;
-	if (![entitlements isKindOfClass:[NSDictionary class]]) {
-		return nil;
-	}
-
-	NSString *accessGroup = SPKStringFromEntitlementValue(entitlements[@"keychain-access-groups"]);
-	if (accessGroup.length > 0) {
-		return accessGroup;
-	}
-
-	NSString *applicationIdentifier = SPKStringFromEntitlementValue(entitlements[@"application-identifier"]);
-	return applicationIdentifier.length > 0 ? applicationIdentifier : nil;
-}
-
-static NSString *SPKAccessGroupFromSentinelKeychainItem(OSStatus *statusOut) {
-	if (!origSecItemCopyMatching || !origSecItemAdd) {
-		if (statusOut) *statusOut = errSecUnimplemented;
-		return nil;
-	}
-
-	NSDictionary *query = @{
-		(__bridge NSString *)kSecClass: (__bridge NSString *)kSecClassGenericPassword,
-		(__bridge NSString *)kSecAttrAccount: @"SPKSideloadFixGenericEntry",
-		(__bridge NSString *)kSecAttrService: @"SPKSideloadFix",
-		(__bridge NSString *)kSecReturnAttributes: (id)kCFBooleanTrue,
-	};
-	NSMutableDictionary *attributes = [query mutableCopy];
-	attributes[(__bridge NSString *)kSecValueData] = [NSData data];
-
-	CFTypeRef result = nil;
-	OSStatus status = origSecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
-	if (status == errSecItemNotFound) {
-		status = origSecItemAdd((__bridge CFDictionaryRef)attributes, &result);
-	}
-	if (statusOut) *statusOut = status;
-	if (status != errSecSuccess || !result) {
-		if (result) CFRelease(result);
-		return nil;
-	}
-
-	id resultObject = (__bridge id)result;
-	NSString *accessGroup = [resultObject isKindOfClass:[NSDictionary class]]
-		? [resultObject objectForKey:(__bridge NSString *)kSecAttrAccessGroup]
-		: nil;
-	accessGroup = [accessGroup copy];
-	CFRelease(result);
-	return accessGroup.length > 0 ? accessGroup : nil;
-}
-
-static NSString *SPKSideloadAccessGroup(void) {
-	static NSString *accessGroup;
-	static NSObject *resolutionLock;
-	static BOOL loggedResolutionFailure = NO;
-	static dispatch_once_t lockOnceToken;
-	dispatch_once(&lockOnceToken, ^{
-		resolutionLock = [NSObject new];
-	});
-
-	@synchronized (resolutionLock) {
-		if (accessGroup.length > 0) {
-			return accessGroup;
-		}
-
-		OSStatus sentinelStatus = errSecSuccess;
-		NSString *sentinelGroup = SPKAccessGroupFromSentinelKeychainItem(&sentinelStatus);
-		NSString *entitlementGroup = sentinelGroup.length == 0 ? SPKAccessGroupFromEntitlements() : nil;
-		NSString *resolvedGroup = sentinelGroup.length > 0 ? sentinelGroup : entitlementGroup;
-		if (resolvedGroup.length > 0 && [resolvedGroup containsString:@"*"]) {
-			NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier] ?: @"com.damianouatu.instagram";
-			resolvedGroup = [resolvedGroup stringByReplacingOccurrencesOfString:@"*" withString:bundleId];
-		}
-		if (resolvedGroup.length == 0) {
-			LSBundleProxy *bundleProxy = [objc_getClass("LSBundleProxy") bundleProxyForCurrentProcess];
-			NSString *teamId = bundleProxy.entitlements[@"com.apple.developer.team-identifier"] ?: @"Y7644YQTNB";
-			NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier] ?: @"com.damianouatu.instagram";
-			resolvedGroup = [NSString stringWithFormat:@"%@.%@", teamId, bundleId];
-		}
-		if (resolvedGroup.length > 0) {
-			accessGroup = [resolvedGroup copy];
-			SPKSideloadLog(@"Resolved usable keychain access group source=%@ sentinelStatus=%d group=%@",
-				sentinelGroup.length > 0 ? @"sentinel" : @"runtime-entitlements",
-				(int)sentinelStatus,
-				accessGroup);
-			return accessGroup;
-		}
-
-		if (!loggedResolutionFailure) {
-			loggedResolutionFailure = YES;
-			SPKSideloadLog(@"No usable keychain access group resolved sentinelStatus=%d; operation will pass through unchanged",
-				(int)sentinelStatus);
-		}
-		return nil;
-	}
-}
-
-typedef struct {
-	BOOL validDictionary;
-	BOOL originalGroupPresent;
-	BOOL patchApplied;
-	BOOL usableGroupDiscovered;
-} SPKAccessGroupPatchInfo;
-
-static CFDictionaryRef SPKCopyDictionaryByReplacingAccessGroup(CFDictionaryRef dictionary,
-	BOOL injectWhenMissing,
-	SPKAccessGroupPatchInfo *info) {
-	SPKAccessGroupPatchInfo patchInfo = {0};
-	NSDictionary *source = (__bridge NSDictionary *)dictionary;
-	if (![source isKindOfClass:[NSDictionary class]]) {
-		if (info) *info = patchInfo;
-		return NULL;
-	}
-	patchInfo.validDictionary = YES;
-
-	id existingAccessGroup = source[(__bridge NSString *)kSecAttrAccessGroup];
-	patchInfo.originalGroupPresent = existingAccessGroup != nil;
-
-	NSString *accessGroup = SPKSideloadAccessGroup();
-	patchInfo.usableGroupDiscovered = accessGroup.length > 0;
-	if (accessGroup.length == 0 || (!patchInfo.originalGroupPresent && !injectWhenMissing)) {
-		if (info) *info = patchInfo;
-		return NULL;
-	}
-
-	NSMutableDictionary *mutableDictionary = [source mutableCopy];
-	if (!mutableDictionary) {
-		if (info) *info = patchInfo;
-		return NULL;
-	}
-
-	mutableDictionary[(__bridge NSString *)kSecAttrAccessGroup] = accessGroup;
-	patchInfo.patchApplied = YES;
-	if (info) *info = patchInfo;
-	return (CFDictionaryRef)CFBridgingRetain(mutableDictionary);
-}
-
-static NSString *SPKBooleanLogValue(BOOL value) {
-	return value ? @"yes" : @"no";
-}
-
-static void SPKLogSecOperation(NSString *operation,
-	OSStatus status,
-	CFAbsoluteTime startedAt,
-	SPKAccessGroupPatchInfo queryInfo,
-	const SPKAccessGroupPatchInfo *updateInfo) {
-	static NSMutableDictionary<NSString *, NSNumber *> *lastLogTimes;
-	static dispatch_once_t onceToken;
-	dispatch_once(&onceToken, ^{
-		lastLogTimes = [NSMutableDictionary dictionary];
-	});
-
-	CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-	NSString *key = [NSString stringWithFormat:@"%@:%d:%d:%d:%d:%d:%d:%d",
-		operation,
-		(int)status,
-		queryInfo.originalGroupPresent,
-		queryInfo.patchApplied,
-		queryInfo.usableGroupDiscovered,
-		updateInfo ? updateInfo->originalGroupPresent : NO,
-		updateInfo ? updateInfo->patchApplied : NO,
-		updateInfo ? updateInfo->usableGroupDiscovered : NO];
-	@synchronized (lastLogTimes) {
-		NSNumber *last = lastLogTimes[key];
-		if (last && now - last.doubleValue < 2.0 && status == errSecSuccess) {
-			return;
-		}
-		lastLogTimes[key] = @(now);
-	}
-
-	if (updateInfo) {
-		SPKSideloadLog(@"Keychain %@ status=%d duration=%.2fms mainThread=%@ usableSignedGroup=%@ queryOriginalGroup=%@ queryGroupReplaced=%@ queryGroupInjected=%@ updateOriginalGroup=%@ updateGroupReplaced=%@",
-			operation,
-			(int)status,
-			(now - startedAt) * 1000.0,
-			[NSThread isMainThread] ? @"yes" : @"no",
-			SPKBooleanLogValue(queryInfo.usableGroupDiscovered || updateInfo->usableGroupDiscovered),
-			SPKBooleanLogValue(queryInfo.originalGroupPresent),
-			SPKBooleanLogValue(queryInfo.originalGroupPresent && queryInfo.patchApplied),
-			SPKBooleanLogValue(!queryInfo.originalGroupPresent && queryInfo.patchApplied),
-			SPKBooleanLogValue(updateInfo->originalGroupPresent),
-			SPKBooleanLogValue(updateInfo->originalGroupPresent && updateInfo->patchApplied));
-		return;
-	}
-
-	SPKSideloadLog(@"Keychain %@ status=%d duration=%.2fms mainThread=%@ usableSignedGroup=%@ originalGroup=%@ groupReplaced=%@ groupInjected=%@",
-		operation,
-		(int)status,
-		(now - startedAt) * 1000.0,
-		[NSThread isMainThread] ? @"yes" : @"no",
-		SPKBooleanLogValue(queryInfo.usableGroupDiscovered),
-		SPKBooleanLogValue(queryInfo.originalGroupPresent),
-		SPKBooleanLogValue(queryInfo.originalGroupPresent && queryInfo.patchApplied),
-		SPKBooleanLogValue(!queryInfo.originalGroupPresent && queryInfo.patchApplied));
+	NSMutableDictionary *mut = [source mutableCopy];
+	// Remove kSecAttrAccessGroup so iOS automatically routes to the application's
+	// default private keychain storage without entitlement check failures (-34018).
+	[mut removeObjectForKey:(__bridge NSString *)kSecAttrAccessGroup];
+	return (CFDictionaryRef)CFBridgingRetain(mut);
 }
 
 static OSStatus zxSecItemAdd(CFDictionaryRef attributes, CFTypeRef *result) {
 	CFAbsoluteTime startedAt = CFAbsoluteTimeGetCurrent();
-	SPKAccessGroupPatchInfo patchInfo = {0};
-	CFDictionaryRef patchedAttributes = SPKCopyDictionaryByReplacingAccessGroup(attributes, YES, &patchInfo);
-	OSStatus status = origSecItemAdd(patchedAttributes ?: attributes, result);
-	if (status != errSecSuccess && patchedAttributes) {
-		status = origSecItemAdd(attributes, result);
+	CFDictionaryRef sanitized = SPKSanitizedKeychainDictionary(attributes);
+	OSStatus status = origSecItemAdd ? origSecItemAdd(sanitized ?: attributes, result) : errSecUnimplemented;
+	if (status == errSecDuplicateItem && sanitized && origSecItemUpdate) {
+		NSDictionary *attrsDict = (__bridge NSDictionary *)sanitized;
+		NSMutableDictionary *query = [NSMutableDictionary dictionary];
+		if (attrsDict[(__bridge NSString *)kSecClass]) query[(__bridge NSString *)kSecClass] = attrsDict[(__bridge NSString *)kSecClass];
+		if (attrsDict[(__bridge NSString *)kSecAttrService]) query[(__bridge NSString *)kSecAttrService] = attrsDict[(__bridge NSString *)kSecAttrService];
+		if (attrsDict[(__bridge NSString *)kSecAttrAccount]) query[(__bridge NSString *)kSecAttrAccount] = attrsDict[(__bridge NSString *)kSecAttrAccount];
+
+		NSMutableDictionary *updateAttrs = [attrsDict mutableCopy];
+		[updateAttrs removeObjectForKey:(__bridge NSString *)kSecClass];
+		[updateAttrs removeObjectForKey:(__bridge NSString *)kSecAttrService];
+		[updateAttrs removeObjectForKey:(__bridge NSString *)kSecAttrAccount];
+
+		status = origSecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)updateAttrs);
+		SPKSideloadLog(@"SecItemAdd duplicate handled via update status=%d", (int)status);
 	}
-	if (patchedAttributes) CFRelease(patchedAttributes);
-	SPKLogSecOperation(@"SecItemAdd", status, startedAt, patchInfo, NULL);
+	if (sanitized) CFRelease(sanitized);
+	SPKSideloadLog(@"SecItemAdd status=%d duration=%.2fms", (int)status, (CFAbsoluteTimeGetCurrent() - startedAt) * 1000.0);
 	return status;
 }
 
 static OSStatus zxSecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result) {
 	CFAbsoluteTime startedAt = CFAbsoluteTimeGetCurrent();
-	SPKAccessGroupPatchInfo patchInfo = {0};
-	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, NO, &patchInfo);
-	OSStatus status = origSecItemCopyMatching(patchedQuery ?: query, result);
-	if (status != errSecSuccess && patchedQuery) {
-		status = origSecItemCopyMatching(query, result);
-	}
-	if (patchedQuery) CFRelease(patchedQuery);
-	SPKLogSecOperation(@"SecItemCopyMatching", status, startedAt, patchInfo, NULL);
+	CFDictionaryRef sanitized = SPKSanitizedKeychainDictionary(query);
+	OSStatus status = origSecItemCopyMatching ? origSecItemCopyMatching(sanitized ?: query, result) : errSecUnimplemented;
+	if (sanitized) CFRelease(sanitized);
+	SPKSideloadLog(@"SecItemCopyMatching status=%d duration=%.2fms", (int)status, (CFAbsoluteTimeGetCurrent() - startedAt) * 1000.0);
 	return status;
 }
 
 static OSStatus zxSecItemUpdate(CFDictionaryRef query, CFDictionaryRef attributesToUpdate) {
 	CFAbsoluteTime startedAt = CFAbsoluteTimeGetCurrent();
-	SPKAccessGroupPatchInfo queryInfo = {0};
-	SPKAccessGroupPatchInfo updateInfo = {0};
-	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, NO, &queryInfo);
-	CFDictionaryRef patchedAttributes = SPKCopyDictionaryByReplacingAccessGroup(attributesToUpdate, NO, &updateInfo);
-	OSStatus status = origSecItemUpdate(patchedQuery ?: query, patchedAttributes ?: attributesToUpdate);
-	if (status != errSecSuccess && (patchedQuery || patchedAttributes)) {
-		status = origSecItemUpdate(query, attributesToUpdate);
-	}
-	if (patchedQuery) CFRelease(patchedQuery);
-	if (patchedAttributes) CFRelease(patchedAttributes);
-	SPKLogSecOperation(@"SecItemUpdate", status, startedAt, queryInfo, &updateInfo);
+	CFDictionaryRef sanitizedQuery = SPKSanitizedKeychainDictionary(query);
+	CFDictionaryRef sanitizedAttrs = SPKSanitizedKeychainDictionary(attributesToUpdate);
+	OSStatus status = origSecItemUpdate ? origSecItemUpdate(sanitizedQuery ?: query, sanitizedAttrs ?: attributesToUpdate) : errSecUnimplemented;
+	if (sanitizedQuery) CFRelease(sanitizedQuery);
+	if (sanitizedAttrs) CFRelease(sanitizedAttrs);
+	SPKSideloadLog(@"SecItemUpdate status=%d duration=%.2fms", (int)status, (CFAbsoluteTimeGetCurrent() - startedAt) * 1000.0);
 	return status;
 }
 
 static OSStatus zxSecItemDelete(CFDictionaryRef query) {
 	CFAbsoluteTime startedAt = CFAbsoluteTimeGetCurrent();
-	SPKAccessGroupPatchInfo patchInfo = {0};
-	CFDictionaryRef patchedQuery = SPKCopyDictionaryByReplacingAccessGroup(query, NO, &patchInfo);
-	OSStatus status = origSecItemDelete(patchedQuery ?: query);
-	if (status != errSecSuccess && patchedQuery) {
-		status = origSecItemDelete(query);
-	}
-	if (patchedQuery) CFRelease(patchedQuery);
-	SPKLogSecOperation(@"SecItemDelete", status, startedAt, patchInfo, NULL);
+	CFDictionaryRef sanitized = SPKSanitizedKeychainDictionary(query);
+	OSStatus status = origSecItemDelete ? origSecItemDelete(sanitized ?: query) : errSecUnimplemented;
+	if (sanitized) CFRelease(sanitized);
+	SPKSideloadLog(@"SecItemDelete status=%d duration=%.2fms", (int)status, (CFAbsoluteTimeGetCurrent() - startedAt) * 1000.0);
 	return status;
 }
 
@@ -281,5 +81,6 @@ void rebindSecFuncs() {
 		{"SecItemUpdate", (void *)zxSecItemUpdate, (void **)&origSecItemUpdate},
 		{"SecItemDelete", (void *)zxSecItemDelete, (void **)&origSecItemDelete}
 	};
-	SPKSideloadLog(@"rebind_symbols result=%d", rebind_symbols(rebinds, 4));
+	int res = rebind_symbols(rebinds, 4);
+	SPKSideloadLog(@"rebind_symbols result=%d", res);
 }

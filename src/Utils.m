@@ -481,6 +481,7 @@ void SPKLogMessage(NSString *category, os_log_type_t type, NSString *format, ...
     NSString *resolvedCategory = nil;
     NSString *resolvedBody = SPKNormalizedLogBody(category, body ?: @"", &resolvedCategory);
     NSString *line = [NSString stringWithFormat:@"[Sparkle %@]: %@", resolvedCategory ?: @"General", resolvedBody ?: @""];
+    NSLog(@"%@", line);
     os_log_with_type(OS_LOG_DEFAULT, type, "%{public}s", line.UTF8String);
 }
 
