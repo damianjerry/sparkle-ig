@@ -62,7 +62,7 @@
 @interface _TtC18IdentitySwitcherUI41IdentitySwitcherMenuOptionsViewController : UIViewController
 @end
 
-@interface IGActionableConfirmationToastPresenter : NSObject
+@interface IGActionableConfirmationToastPresenter (SPKLock)
 - (void)showAccountSwitcherPartialSheet:(id)sheet completion:(id)comp;
 @end
 
@@ -894,7 +894,7 @@ static BOOL SPKIsSettingsOrAccountsViewController(UIViewController *vc) {
         SPKLog(@"AccountLock", @"Blocked UIControl sendAction:%@ on view with blocked text", NSStringFromSelector(action));
         return;
     }
-    if ([self.accessibilityIdentifier isEqualToString:@"profile-app-switch-button"]) {
+    if ([((UIControl *)self).accessibilityIdentifier isEqualToString:@"profile-app-switch-button"]) {
         SPKLog(@"AccountLock", @"Blocked profile-app-switch-button UIControl");
         return;
     }
@@ -906,10 +906,10 @@ static BOOL SPKIsSettingsOrAccountsViewController(UIViewController *vc) {
 %hook UIGestureRecognizer
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    UIView *v = self.view;
+    UIView *v = ((UIGestureRecognizer *)self).view;
     if (v && (SPKViewContainsBlockedText(v) || [v.accessibilityIdentifier isEqualToString:@"profile-app-switch-button"])) {
         SPKLog(@"AccountLock", @"Blocked gesture on view with blocked text/identifier");
-        self.state = UIGestureRecognizerStateFailed;
+        ((UIGestureRecognizer *)self).state = UIGestureRecognizerStateFailed;
         return;
     }
     %orig;
@@ -1058,14 +1058,14 @@ static void SPKTriggerSingleAccountLogin(id viewOrVC) {
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     dispatch_async(dispatch_get_main_queue(), ^{
-        SPKTriggerSingleAccountLogin(self.view);
+        SPKTriggerSingleAccountLogin(((UIViewController *)self).view);
     });
 }
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        SPKTriggerSingleAccountLogin(self.view);
+        SPKTriggerSingleAccountLogin(((UIViewController *)self).view);
     });
 }
 
@@ -1085,7 +1085,7 @@ static void SPKTriggerSingleAccountLogin(id viewOrVC) {
 
 - (void)didMoveToWindow {
     %orig;
-    if (self.window) {
+    if (((UIView *)self).window) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.02 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             SPKTriggerSingleAccountLogin((UIView *)self);
         });
@@ -1095,7 +1095,7 @@ static void SPKTriggerSingleAccountLogin(id viewOrVC) {
 - (void)layoutSubviews {
     %orig;
     static BOOL s_layoutTriggered = NO;
-    if (!s_layoutTriggered && self.window) {
+    if (!s_layoutTriggered && ((UIView *)self).window) {
         s_layoutTriggered = YES;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             SPKTriggerSingleAccountLogin((UIView *)self);
